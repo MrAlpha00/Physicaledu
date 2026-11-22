@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
   BookOpenCheck,
   CalendarCheck,
+  CalendarDays,
   LayoutDashboard,
   LogOut,
+  MessageSquareText,
+  Package,
   QrCode,
+  Trophy,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -21,14 +26,17 @@ import { cn } from "@/lib/utils";
 export function StudentShell({
   profile,
   isPeStudent,
+  unreadNotifications = 0,
   children,
 }: {
   profile: ProfileRow;
   isPeStudent: boolean;
+  unreadNotifications?: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const isAdmin = isPeAdminRole(profile.roles);
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const links = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     ...(isPeStudent
@@ -38,6 +46,10 @@ export function StudentShell({
         ]
       : []),
     { href: "/tasks", label: "Tasks", icon: BookOpenCheck },
+    { href: "/equipment", label: "Equipment", icon: Package },
+    { href: "/calendar", label: "Calendar", icon: CalendarDays },
+    { href: "/feedback", label: "Feedback", icon: MessageSquareText },
+    { href: "/my-sports-profile", label: "My sport", icon: Trophy },
     { href: "/scan", label: "Scan QR", icon: QrCode },
     { href: "/profile", label: "Profile", icon: UserRound },
   ];
@@ -55,7 +67,7 @@ export function StudentShell({
                   href={href}
                   className={cn(
                     "flex items-center gap-2 border-b-2 px-3 py-5 text-xs font-bold uppercase tracking-[0.1em] transition-colors",
-                    pathname === href
+                    isActive(href)
                       ? "border-cobalt text-cobalt"
                       : "border-transparent text-ink-muted hover:text-navy",
                   )}
@@ -76,6 +88,18 @@ export function StudentShell({
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/notifications"
+              aria-label={`Notifications${unreadNotifications > 0 ? `, ${unreadNotifications} unread` : ""}`}
+              className="relative flex size-9 items-center justify-center border border-navy/15 text-navy transition-colors hover:border-navy hover:bg-navy/5"
+            >
+              <Bell className="size-4" />
+              {unreadNotifications > 0 ? (
+                <span className="absolute -right-1.5 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-coral px-1 text-[0.6rem] font-bold text-white">
+                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                </span>
+              ) : null}
+            </Link>
             <div className="hidden text-right sm:block">
               <p className="text-xs font-bold text-navy">{profile.fullName}</p>
               <div className="mt-0.5">
@@ -108,7 +132,7 @@ export function StudentShell({
             href={href}
             className={cn(
               "flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 px-2 py-3 text-[0.62rem] font-bold uppercase tracking-[0.08em]",
-              pathname === href ? "text-cobalt" : "text-ink-muted",
+              isActive(href) ? "text-cobalt" : "text-ink-muted",
             )}
           >
             <Icon className="size-5" />

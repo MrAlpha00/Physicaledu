@@ -21,7 +21,7 @@ function refreshStudentProfile() {
 }
 
 export async function saveSportsProfile(input: SportsProfileInput): Promise<ActionState> {
-  const user = await requireUser();
+  await requireUser();
   const parsed = sportsProfileSchema.safeParse(input);
   if (!parsed.success) return { status: "error", message: firstIssue(parsed.error) };
 
@@ -60,6 +60,8 @@ export async function suggestAchievement(
   void id;
   void studentDirectoryId;
   void verificationStatus;
+  // Evidence is uploaded after the suggestion exists, then attached by id.
+  void evidenceFileId;
 
   const supabase = await createClient();
   const { data: rows, error } = await supabase.rpc("student_suggest_achievement", {

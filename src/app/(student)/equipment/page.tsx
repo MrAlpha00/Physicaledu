@@ -5,7 +5,7 @@ import { Phase3Header, Phase3Notice } from "@/components/phase3/common";
 import { EmptyState } from "@/components/shared/empty-state";
 import { requireUser } from "@/lib/auth/session";
 import { getEquipmentAssets, getEquipmentItems } from "@/lib/data/phase3-equipment";
-import { toIstLocalInput } from "@/lib/time/india";
+import { defaultPhase3ReturnAt } from "@/lib/time/phase3";
 
 export const metadata: Metadata = { title: "Borrow equipment" };
 
@@ -13,7 +13,7 @@ export default async function StudentEquipmentPage() {
   await requireUser();
   const [items, assets] = await Promise.all([getEquipmentItems(), getEquipmentAssets()]);
   const availableItems = items.filter((item) => item.isActive && item.availableQuantity > 0);
-  const defaultReturnAt = toIstLocalInput(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+  const defaultReturnAt = defaultPhase3ReturnAt(3);
 
   return (
     <div className="space-y-8">

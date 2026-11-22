@@ -11,10 +11,15 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
+  MessageSquareText,
+  Package,
   QrCode,
+  Trophy,
   UserRoundCheck,
   UsersRound,
+  Wrench,
   X,
 } from "lucide-react";
 import { Brand } from "@/components/layout/brand";
@@ -47,6 +52,26 @@ const navigation = [
     children: [
       { href: "/admin/rooms", label: "Live occupancy" },
       { href: "/admin/rooms/config", label: "Room configuration" },
+    ],
+  },
+  {
+    label: "Department (Phase 3)",
+    icon: Wrench,
+    children: [
+      { href: "/admin/equipment", label: "Equipment & maintenance" },
+      { href: "/admin/calendar", label: "PE calendar" },
+      { href: "/admin/feedback", label: "Student feedback" },
+      { href: "/admin/game-rules", label: "Game rules CMS" },
+      { href: "/admin/sports-profiles", label: "Sports profiles" },
+      { href: "/admin/reports", label: "Reports & exports" },
+    ],
+  },
+  {
+    label: "Communications",
+    icon: Megaphone,
+    children: [
+      { href: "/admin/announcements", label: "Announcements" },
+      { href: "/admin/notifications", label: "Notifications & email" },
     ],
   },
   { href: "/admin/qr-codes", label: "QR Manager", icon: QrCode },

@@ -150,7 +150,7 @@ export default async function PublicGameRuleDetailPage({ params }: { params: Pro
             </dl>
           </div>
           <Phase3Notice>
-            Follow your teacher's instructions as well as these published rules. Report unsafe conditions to a PE staff member.
+            Follow your teacher&apos;s instructions as well as these published rules. Report unsafe conditions to a PE staff member.
           </Phase3Notice>
         </aside>
       </div>

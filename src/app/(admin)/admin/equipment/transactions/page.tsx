@@ -8,7 +8,7 @@ import {
   getEquipmentTransactions,
 } from "@/lib/data/phase3-equipment";
 import { createClient } from "@/lib/supabase/server";
-import { toIstLocalInput } from "@/lib/time/india";
+import { defaultPhase3ReturnAt } from "@/lib/time/phase3";
 
 export const metadata: Metadata = { title: "Equipment transactions" };
 
@@ -35,7 +35,7 @@ export default async function AdminEquipmentTransactionsPage() {
     })(),
   ]);
 
-  const defaultReturnAt = toIstLocalInput(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  const defaultReturnAt = defaultPhase3ReturnAt(7);
 
   return (
     <div className="space-y-8">

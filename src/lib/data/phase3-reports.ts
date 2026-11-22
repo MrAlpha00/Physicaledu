@@ -130,7 +130,7 @@ export const getPhase3ReportData = cache(async ({ from, to }: ReportWindow): Pro
 
 export const getPhase3DashboardMetrics = cache(async (): Promise<Phase3DashboardMetrics> => {
   const supabase = await createClient();
-  const [items, transactions, maintenance, feedback, events, notifications, achievements, emails, recipients, drafts] = await Promise.all([
+  const [items, transactions, maintenance, feedback, events, notifications, achievements, recipients, drafts] = await Promise.all([
     getEquipmentItems(),
     getEquipmentTransactions(),
     getMaintenanceRecords(),
@@ -138,7 +138,6 @@ export const getPhase3DashboardMetrics = cache(async (): Promise<Phase3Dashboard
     getAdminCalendarEvents(),
     supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
     getAdminAchievements(),
-    supabase.from("email_announcements").select("id, status"),
     supabase.from("email_recipients").select("status"),
     supabase.from("game_rule_posts").select("id", { count: "exact", head: true }).eq("status", "draft"),
   ]);

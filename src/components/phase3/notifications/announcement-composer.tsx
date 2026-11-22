@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Send, Trash2 } from "lucide-react";
 import { saveAnnouncement } from "@/app/(admin)/admin/announcements/actions";
@@ -40,11 +40,13 @@ export function AnnouncementComposer({
   groups,
   students,
   emailWarning,
+  uploadParentId,
 }: {
   departments: DepartmentOption[];
   groups: Array<{ id: string; name: string; isActive: boolean }>;
   students: Array<{ id: string; full_name: string }>;
   emailWarning: string | null;
+  uploadParentId: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -56,13 +58,6 @@ export function AnnouncementComposer({
   const [sendEmail, setSendEmail] = useState(false);
   const [dailyLimit, setDailyLimit] = useState("100");
   const [audiences, setAudiences] = useState<AudienceRow[]>([{ audienceType: "all_students", departmentId: "", semester: "", studentDirectoryId: "", groupId: "" }]);
-  const [uploadParentId, setUploadParentId] = useState("");
-
-  // The upload needs a parent id before the announcement exists. Generate it on
-  // the client only so server and markup never disagree during hydration.
-  useEffect(() => {
-    setUploadParentId(crypto.randomUUID());
-  }, []);
 
   function updateAudience(index: number, patch: Partial<AudienceRow>) {
     setAudiences((rows) => rows.map((row, position) => (position === index ? { ...row, ...patch } : row)));

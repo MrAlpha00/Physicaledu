@@ -10,6 +10,13 @@ const PROTECTED_PREFIXES = [
   "/tasks",
   "/scan",
   "/room",
+  "/equipment",
+  "/my-equipment",
+  "/feedback",
+  "/my-feedback",
+  "/notifications",
+  "/my-sports-profile",
+  "/print",
 ];
 const GUEST_ONLY_PATHS = ["/login", "/register", "/forgot-password"];
 
@@ -54,7 +61,8 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isProtected = hasPrefix(pathname, PROTECTED_PREFIXES);
-  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdminRoute =
+    pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/print/");
   const isGuestOnly = hasPrefix(pathname, GUEST_ONLY_PATHS);
 
   if (!user) {

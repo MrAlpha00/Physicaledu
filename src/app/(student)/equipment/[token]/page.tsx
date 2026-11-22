@@ -12,7 +12,8 @@ import {
   getMyEquipmentTransactions,
   resolveEquipmentQrToken,
 } from "@/lib/data/phase3-equipment";
-import { formatIstDateTime, toIstLocalInput } from "@/lib/time/india";
+import { formatIstDateTime } from "@/lib/time/india";
+import { defaultPhase3ReturnAt } from "@/lib/time/phase3";
 
 export const metadata: Metadata = { title: "Equipment QR" };
 
@@ -53,7 +54,7 @@ export default async function EquipmentQrPage({
     getEquipmentAssets(qr.itemId),
     getMyEquipmentTransactions(),
   ]);
-  const defaultReturnAt = toIstLocalInput(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+  const defaultReturnAt = defaultPhase3ReturnAt(3);
   const matchingOpen = transactions.filter(
     (entry) =>
       entry.itemId === qr.itemId &&

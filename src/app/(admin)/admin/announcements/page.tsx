@@ -50,6 +50,9 @@ export default async function AdminAnnouncementsPage() {
   ]);
   const warning = getResendConfigurationWarning();
   const notifiedCounts = await getNotifiedCounts();
+  // The attachment is uploaded before the announcement row exists; the server
+  // issues a stable parent id so client and server markup stay identical.
+  const uploadParentId = crypto.randomUUID();
   const today = istDateString();
   const acceptedToday = usage.find((row) => row.usage_date === today)?.accepted_count ?? 0;
 
@@ -90,6 +93,7 @@ export default async function AdminAnnouncementsPage() {
             groups={groups.map((group) => ({ id: group.id, name: group.name, isActive: group.isActive }))}
             students={students.map((student) => ({ id: student.id, full_name: student.full_name }))}
             emailWarning={warning}
+            uploadParentId={uploadParentId}
           />
           <div className="space-y-4">
             <div className="border border-navy/10 bg-white p-6 shadow-sm">

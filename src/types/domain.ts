@@ -23,7 +23,6 @@ import type {
   GameRuleStatus,
   MembershipStatus,
   NotificationCategory,
-  NotificationChannel,
   NotificationPriority,
   Phase3AudienceType,
   QrType,
