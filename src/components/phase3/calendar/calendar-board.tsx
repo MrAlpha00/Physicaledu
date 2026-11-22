@@ -63,10 +63,10 @@ export function CalendarBoard({ occurrences }: { occurrences: CalendarOccurrence
   const upcoming = useMemo(
     () =>
       occurrences
-        .filter((occurrence) => new Date(occurrence.endsAt).getTime() >= Date.now())
+        .filter((occurrence) => new Date(occurrence.endsAt).getTime() >= now.getTime())
         .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
         .slice(0, 6),
-    [occurrences],
+    [occurrences, now],
   );
 
   return (
