@@ -95,7 +95,10 @@ export const getMySportsProfile = cache(async (user: User): Promise<SportsProfil
   const profile = profileResult.data;
   return {
     userId: user.id,
-    fullName: user.user_metadata?.full_name ?? profile?.biography ?? user.email?.split("@")[0] ?? "Student",
+    fullName: (identityResult.data as { full_name?: string | null } | null)?.full_name
+      ?? user.user_metadata?.full_name
+      ?? user.email?.split("@")[0]
+      ?? "Student",
     departmentName: directoryInfo.departmentName,
     academicYear: directoryInfo.academicYear,
     semester: directoryInfo.semester,
