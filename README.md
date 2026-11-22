@@ -127,6 +127,27 @@ npm test           # Vitest unit tests
   not delete their account.
 - Real-data student and admin dashboards with empty states.
 
+## Phase 2 features
+
+- Attendance snapshots from active PE memberships, student submissions, admin
+  review/manual decisions, finalisation, realtime board and personal history.
+- OR-based task audiences, deadlines, text/link/file submissions, review
+  feedback and submission history for eligible students only.
+- Public visitor register with optional Turnstile, privacy-safe today's board,
+  PE-Admin-only full records and genuine `.xlsx` exports.
+- Room entry/exit QR workflow, configurable activities, stale detection, forced
+  closure with reason, live occupancy and filtered history.
+- QR centre with high-entropy tokens, SVG/PNG posters, A4 print view, ZIP
+  bundle, activation control and token regeneration.
+- R2-backed file storage with short-lived presigned URLs, authoritative file
+  validation and metadata/permissions in Supabase.
+- Detailed guides: [PHASE_2.md](docs/PHASE_2.md),
+  [ATTENDANCE_WORKFLOW.md](docs/ATTENDANCE_WORKFLOW.md),
+  [TASK_MANAGEMENT.md](docs/TASK_MANAGEMENT.md),
+  [VISITOR_REGISTER.md](docs/VISITOR_REGISTER.md),
+  [ROOM_MANAGEMENT.md](docs/ROOM_MANAGEMENT.md),
+  [QR_SYSTEM.md](docs/QR_SYSTEM.md), [R2_SETUP.md](docs/R2_SETUP.md).
+
 ## Architecture
 
 ```text
@@ -139,15 +160,21 @@ src/
     tables/            admin management tables
     shared/            badges, empty states
   lib/
+    actions/           file upload/download server actions
     auth/              server-side session and role checks
     data/              grouped Supabase queries for dashboards/pages
     env/               server/public environment access
+    operations/        pure attendance/task/room/visitor rules
     permissions/       role constants and helpers
+    qr/                token destinations, themes and poster rendering
+    security/          server-side Turnstile verification
+    storage/           R2 client, presigning and file validation
     supabase/          browser, server, privileged and proxy clients
-    utils/             normalisation, formatting, import parsing
+    time/              Asia/Kolkata boundaries and presets
+    utils/             normalisation, formatting, import parsing, rate limiting
     validations/       centralised Zod schemas
   types/               database and view-model types
-supabase/migrations/   phase 1 SQL migration
+supabase/migrations/   phase 1 and phase 2 additive SQL migrations
 docs/                  setup, database, admin and phase documentation
 tests/                 unit tests for pure logic
 ```
