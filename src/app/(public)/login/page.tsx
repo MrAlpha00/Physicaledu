@@ -9,6 +9,7 @@ type SearchParams = Promise<{
   next?: string;
   registered?: string;
   signedOut?: string;
+  error?: string;
 }>;
 
 export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
@@ -56,6 +57,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
                 <span>{notice}</span>
               </div>
+            ) : null}
+
+            {params.error ? (
+              <p role="alert" className="mt-6 border-l-4 border-l-coral bg-coral/10 p-4 text-sm text-[#8b3725]">
+                {params.error}
+              </p>
             ) : null}
 
             <div className="mt-7">
