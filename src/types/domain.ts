@@ -371,3 +371,303 @@ export interface QrCodeView {
   createdAt: string;
   updatedAt: string;
 }
+
+/* ------------------------------- Phase 3 -------------------------------- */
+
+export interface Phase3AudienceInput {
+  audienceType: Phase3AudienceType;
+  departmentId?: string | null;
+  semester?: number | null;
+  studentDirectoryId?: string | null;
+  groupId?: string | null;
+}
+
+export interface Phase3RecurrenceInput {
+  frequency: RecurrenceFrequency;
+  intervalCount: number;
+  byWeekday?: number[];
+  endsOn?: string | null;
+  occurrenceLimit?: number | null;
+}
+
+export interface EquipmentCategoryView {
+  id: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface EquipmentItemView {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  name: string;
+  description: string | null;
+  identificationNumber: string | null;
+  trackingMode: EquipmentTrackingMode;
+  quantity: number;
+  availableQuantity: number;
+  borrowedQuantity: number;
+  maintenanceQuantity: number;
+  damagedQuantity: number;
+  retiredQuantity: number;
+  inventoryStatus: EquipmentInventoryStatus;
+  condition: EquipmentCondition;
+  storageLocation: string | null;
+  purchasedOn: string | null;
+  usefulLifeMonths: number | null;
+  isActive: boolean;
+  assetCount: number;
+  createdAt: string;
+}
+
+export interface EquipmentAssetView {
+  id: string;
+  itemId: string;
+  assetTag: string;
+  serialNumber: string | null;
+  condition: EquipmentCondition;
+  status: "available" | "borrowed" | "under_maintenance" | "damaged" | "retired" | "unavailable";
+  location: string | null;
+  notes: string | null;
+}
+
+export interface EquipmentTransactionView {
+  id: string;
+  itemId: string;
+  itemName: string;
+  assetId: string | null;
+  assetTag: string | null;
+  studentDirectoryId: string;
+  studentName: string;
+  quantityIssued: number;
+  quantityReturned: number;
+  issuedAt: string;
+  expectedReturnAt: string;
+  displayStatus: EquipmentTransactionStatus;
+  damageIndicator: boolean;
+  notes: string | null;
+  returnNotes: string | null;
+  correctionReason: string | null;
+}
+
+export interface EquipmentMaintenanceView {
+  id: string;
+  itemId: string;
+  itemName: string;
+  assetId: string | null;
+  issueDescription: string;
+  maintenanceType: "damage" | "fault" | "repair" | "inspection" | "other";
+  quantityAffected: number;
+  reportedAt: string;
+  assignedPerson: string | null;
+  scheduledFor: string | null;
+  expectedCompletionAt: string | null;
+  completedAt: string | null;
+  status: EquipmentMaintenanceStatus;
+  resolutionNotes: string | null;
+  cost: number | null;
+}
+
+export interface EquipmentQrResult {
+  qrId: string;
+  itemId: string;
+  assetId: string | null;
+  itemName: string;
+  trackingMode: EquipmentTrackingMode;
+  availableQuantity: number;
+  assetTag: string | null;
+  condition: EquipmentCondition;
+  theme: string;
+}
+
+export interface CalendarOccurrenceView {
+  occurrenceId: string;
+  eventId: string;
+  ruleId: string | null;
+  title: string;
+  description: string | null;
+  category: CalendarCategory;
+  startsAt: string;
+  endsAt: string;
+  venue: string | null;
+  visibility: CalendarVisibility;
+  status: CalendarStatus;
+  isOverride: boolean;
+  isCancelled: boolean;
+}
+
+export interface CalendarEventView extends CalendarOccurrenceView {
+  audiences: Phase3AudienceInput[];
+  recurrence: Phase3RecurrenceInput | null;
+  canManage: boolean;
+}
+
+export interface FeedbackRequestView {
+  id: string;
+  subject: string;
+  category: FeedbackCategory;
+  description: string;
+  status: FeedbackStatus;
+  priority: FeedbackPriority;
+  preferredResponse: "in_app" | "email" | "either" | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  studentName: string;
+  departmentName: string | null;
+  replyCount: number;
+  unreadForAdmin: boolean;
+}
+
+export interface FeedbackReplyView {
+  id: string;
+  body: string;
+  isInternal: boolean;
+  createdAt: string;
+  authorName: string;
+  isMine: boolean;
+}
+
+export interface GameRuleBlockView {
+  id: string;
+  blockType: GameRuleBlockType;
+  content: Record<string, unknown>;
+  sortOrder: number;
+}
+
+export interface GameRulePostView {
+  id: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  title: string;
+  slug: string;
+  introduction: string | null;
+  history: string | null;
+  aboutGame: string | null;
+  howToPlay: string | null;
+  rulesText: string | null;
+  equipmentRequired: string | null;
+  playersCount: string | null;
+  playingArea: string | null;
+  instructions: string | null;
+  safetyInstructions: string | null;
+  videoUrls: string[];
+  status: GameRuleStatus;
+  publishedAt: string | null;
+  isFeatured: boolean;
+  isPinned: boolean;
+  updatedAt: string;
+  blocks: GameRuleBlockView[];
+}
+
+export interface NotificationView {
+  id: string;
+  title: string;
+  body: string;
+  category: NotificationCategory;
+  link: string | null;
+  priority: NotificationPriority;
+  announcementId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface AnnouncementView {
+  id: string;
+  title: string;
+  message: string;
+  link: string | null;
+  priority: NotificationPriority;
+  audienceSummary: string | null;
+  publishedAt: string;
+  notifiedCount: number;
+  emailAnnouncementId: string | null;
+  emailStatus: EmailAnnouncementStatus | null;
+  emailRecipientCount: number;
+  emailAcceptedCount: number;
+  emailDeliveredCount: number;
+}
+
+export interface EmailRecipientView {
+  id: string;
+  email: string;
+  status: EmailRecipientStatus;
+  attempts: number;
+  lastError: string | null;
+  acceptedAt: string | null;
+  deliveredAt: string | null;
+  failedAt: string | null;
+}
+
+export interface AchievementView {
+  id: string;
+  studentDirectoryId: string;
+  studentName: string;
+  title: string;
+  sport: string;
+  eventName: string | null;
+  academicYear: string | null;
+  achievementDate: string | null;
+  positionResult: string | null;
+  awardDescription: string | null;
+  verificationStatus: AchievementVerificationStatus;
+  sourceType: "student_entry" | "admin_record" | "future_event" | "future_game";
+  verificationNote: string | null;
+  createdAt: string;
+}
+
+export interface SportsProfileView {
+  userId: string;
+  fullName: string;
+  departmentName: string | null;
+  academicYear: number | null;
+  semester: number | null;
+  biography: string | null;
+  sportsInterests: string[];
+  preferredSports: string[];
+  isPublic: boolean;
+  achievements: AchievementView[];
+  participationCount: number;
+}
+
+export interface PublicSportsProfileView {
+  fullName: string;
+  departmentName: string;
+  academicYear: number;
+  semester: number;
+  biography: string | null;
+  preferredSports: string[];
+  sportsInterests: string[];
+  achievements: Array<{
+    title: string;
+    sport: string;
+    eventName: string | null;
+    academicYear: string | null;
+    achievementDate: string | null;
+    positionResult: string | null;
+    awardDescription: string | null;
+  }>;
+}
+
+export interface Phase3ReportRow {
+  label: string;
+  value: number;
+  detail?: string | null;
+}
+
+export interface Phase3DashboardMetrics {
+  equipmentItems: number;
+  equipmentIssued: number;
+  equipmentOverdue: number;
+  maintenanceOpen: number;
+  upcomingEvents: number;
+  pendingFeedback: number;
+  draftGameRules: number;
+  unreadNotifications: number;
+  pendingAchievements: number;
+  emailAcceptedToday: number;
+  emailDeliveredCount: number;
+  emailFailedCount: number;
+}
