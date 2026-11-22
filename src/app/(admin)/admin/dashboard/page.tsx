@@ -2,17 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowUpRight,
+  BarChart3,
+  BellRing,
+  BookOpen,
   Building2,
+  CalendarDays,
   ClipboardCheck,
   ClipboardList,
   DoorOpen,
   GraduationCap,
   IdCard,
+  Mail,
+  MessageSquareText,
+  Package,
   QrCode,
+  Trophy,
   Timer,
   UserCheck,
   UserRoundCheck,
   UsersRound,
+  Wrench,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +33,7 @@ import {
   getRecentRegistrations,
 } from "@/lib/data/admin";
 import { getPhase2AdminMetrics } from "@/lib/data/phase2-dashboard";
+import { getPhase3DashboardMetrics } from "@/lib/data/phase3-reports";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin dashboard" };
@@ -71,15 +81,56 @@ const quickLinks = [
     description: "Download, print and rotate all official PE QR posters.",
     icon: QrCode,
   },
+  {
+    href: "/admin/equipment",
+    title: "Equipment store",
+    description: "Inventory, issue/return ledger, maintenance and equipment QR labels.",
+    icon: Package,
+  },
+  {
+    href: "/admin/calendar",
+    title: "PE calendar",
+    description: "Published events, recurring schedules and audience targeting.",
+    icon: CalendarDays,
+  },
+  {
+    href: "/admin/feedback",
+    title: "Student feedback",
+    description: "Requests, replies, internal notes and resolution tracking.",
+    icon: MessageSquareText,
+  },
+  {
+    href: "/admin/game-rules",
+    title: "Game rules CMS",
+    description: "Publish structured rules and guides for students and guests.",
+    icon: BookOpen,
+  },
+  {
+    href: "/admin/sports-profiles",
+    title: "Sports achievements",
+    description: "Verify student suggestions and record official achievements.",
+    icon: Trophy,
+  },
+  {
+    href: "/admin/reports",
+    title: "Reports & exports",
+    description: "Attendance, equipment, feedback and achievement reporting with real .xlsx exports.",
+    icon: BarChart3,
+  },
 ];
 
 export default async function AdminDashboardPage() {
-  const [metrics, recent, departments, phase2] = await Promise.all([
+  const [metrics, recent, departments, phase2, phase3Result] = await Promise.all([
     getAdminMetrics(),
     getRecentRegistrations(),
     getDepartmentOptions(),
     getPhase2AdminMetrics(),
+    getPhase3DashboardMetrics().then(
+      (value) => ({ value }),
+      () => ({ value: null }),
+    ),
   ]);
+  const phase3 = phase3Result.value;
 
   const cards = [
     { label: "Registered accounts", value: metrics.registeredAccounts, icon: UsersRound, accent: "bg-cobalt" },
@@ -160,6 +211,56 @@ export default async function AdminDashboardPage() {
           ))}
         </div>
       </section>
+
+      {phase3 ? (
+        <section aria-label="Phase 3 department metrics">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b-2 border-navy pb-3">
+            <div>
+              <p className="eyebrow text-cobalt">Phase 3 · Department management</p>
+              <h2 className="mt-2 text-2xl font-bold">Equipment, calendar & communications</h2>
+            </div>
+            <Link href="/admin/reports" className="eyebrow text-cobalt hover:underline">
+              Full reports <ArrowUpRight className="inline size-3" />
+            </Link>
+          </div>
+          <div className="grid gap-px border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: "Equipment items", value: phase3.equipmentItems, href: "/admin/equipment", icon: Package },
+              { label: "Currently issued", value: phase3.equipmentIssued, href: "/admin/equipment/transactions", icon: Wrench },
+              { label: "Overdue returns", value: phase3.equipmentOverdue, href: "/admin/equipment/transactions", icon: Timer },
+              { label: "Open maintenance", value: phase3.maintenanceOpen, href: "/admin/equipment/maintenance", icon: Wrench },
+              { label: "Upcoming events", value: phase3.upcomingEvents, href: "/admin/calendar", icon: CalendarDays },
+              { label: "Open feedback", value: phase3.pendingFeedback, href: "/admin/feedback", icon: MessageSquareText },
+              { label: "Pending achievements", value: phase3.pendingAchievements, href: "/admin/sports-profiles", icon: Trophy },
+              { label: "Unread notifications", value: phase3.unreadNotifications, href: "/admin/notifications", icon: BellRing },
+            ].map((item) => (
+              <Link key={item.label} href={item.href} className="bg-card p-5 transition-colors hover:bg-lime/20">
+                <div className="flex items-start justify-between">
+                  <span className="eyebrow text-ink-muted">{item.label}</span>
+                  <item.icon className="size-4 text-ink-muted" />
+                </div>
+                <p className="stat-number mt-3 text-4xl">{item.value}</p>
+                <p className="mt-2 text-[0.65rem] uppercase tracking-[0.12em] text-cobalt">Open board →</p>
+              </Link>
+            ))}
+          </div>
+          <div className="mt-px grid gap-px border border-border bg-border sm:grid-cols-3">
+            {[
+              { label: "Game-rule drafts", value: phase3.draftGameRules },
+              { label: "Email accepted today", value: phase3.emailAcceptedToday },
+              { label: "Email delivered (webhook)", value: phase3.emailDeliveredCount },
+            ].map((item) => (
+              <div key={item.label} className="bg-card p-5">
+                <span className="eyebrow text-ink-muted">{item.label}</span>
+                <p className="stat-number mt-3 text-4xl">{item.value}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 flex items-center gap-2 text-[0.65rem] uppercase tracking-[0.1em] text-ink-muted">
+            <Mail className="size-3" /> Accepted by Resend is not the same as delivered; delivery is recorded by signed webhook.
+          </p>
+        </section>
+      ) : null}
 
       <div className="grid gap-8 xl:grid-cols-[1.4fr_0.6fr]">
         <section>

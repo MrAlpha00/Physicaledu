@@ -439,6 +439,7 @@ create table public.feedback_status_history (
   to_status text not null,
   actor_id uuid references auth.users (id) on delete set null,
   note text,
+  is_internal boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -663,7 +664,7 @@ create table public.email_recipients (
 );
 
 create index email_recipients_dispatch_idx on public.email_recipients (status, queued_at);
-create index email_recipients_provider_idx on public.email_recipients (provider_message_id)
+create unique index email_recipients_provider_idx on public.email_recipients (provider_message_id)
   where provider_message_id is not null;
 create trigger email_recipients_set_updated_at before update on public.email_recipients
   for each row execute function public.set_updated_at();
@@ -783,7 +784,10 @@ create or replace function public.phase3_student_directory_id(
 ) returns uuid
 language sql security definer stable set search_path = public, pg_temp
 as $$
-  select public.student_directory_id_for_user(p_user_id);
+  select sd.id
+  from public.student_directory sd
+  where sd.id = public.student_directory_id_for_user(p_user_id)
+    and sd.is_active;
 $$;
 
 create or replace function public.phase3_matches_audience(
@@ -798,7 +802,8 @@ declare
   v_department_id uuid;
   v_semester integer;
 begin
-  if p_audiences is null or jsonb_array_length(p_audiences) = 0 then
+  if p_audiences is null or jsonb_typeof(p_audiences) <> 'array'
+     or jsonb_array_length(p_audiences) = 0 then
     return false;
   end if;
 
@@ -808,7 +813,7 @@ begin
   end if;
 
   select department_id, semester into v_department_id, v_semester
-  from public.student_directory where id = v_directory_id;
+  from public.student_directory where id = v_directory_id and is_active;
 
   for v_row in select value from jsonb_array_elements(p_audiences)
   loop
@@ -856,13 +861,10 @@ declare
   v_enabled boolean;
   v_notification_id uuid;
 begin
-  if p_user_id is null or p_announcement_id is null then
-    select enabled into v_enabled
-    from public.notification_preferences
-    where user_id = p_user_id and category = p_category and channel = 'in_app';
-  else
-    v_enabled := true;
-  end if;
+  -- Announcements are notifications too: an explicit opt-out always wins.
+  select enabled into v_enabled
+  from public.notification_preferences
+  where user_id = p_user_id and category = p_category and channel = 'in_app';
 
   if v_enabled = false then
     return null;
@@ -925,6 +927,54 @@ begin
 
   return public.is_active_pe_student(p_user_id)
     and public.student_matches_calendar(p_event_id, p_user_id);
+end;
+$$;
+
+-- Safe caller-scoped wrappers. These are the only identity helpers granted to
+-- clients: they ignore any caller-supplied user id and always use auth.uid().
+create or replace function public.current_phase3_student_directory_id()
+returns uuid
+language sql security definer stable set search_path = public, pg_temp
+as $$
+  select public.phase3_student_directory_id(auth.uid());
+$$;
+
+create or replace function public.current_phase3_matches_audience(p_audiences jsonb)
+returns boolean
+language sql security definer stable set search_path = public, pg_temp
+as $$
+  select public.phase3_matches_audience(p_audiences, auth.uid());
+$$;
+
+create or replace function public.current_can_view_calendar_event(p_event_id uuid)
+returns boolean
+language sql security definer stable set search_path = public, pg_temp
+as $$
+  select public.can_view_calendar_event(p_event_id, auth.uid());
+$$;
+
+create or replace function public.current_matches_announcement(p_announcement_id uuid)
+returns boolean
+language plpgsql security definer stable set search_path = public, pg_temp
+as $$
+declare
+  v_audiences jsonb;
+begin
+  if public.is_pe_admin() then return true; end if;
+  if auth.uid() is null then return false; end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'audience_type', a.audience_type,
+    'department_id', a.department_id,
+    'semester', a.semester,
+    'student_directory_id', a.student_directory_id,
+    'group_id', a.group_id
+  )), '[]'::jsonb)
+  into v_audiences
+  from public.announcement_audiences a
+  where a.announcement_id = p_announcement_id;
+
+  return public.phase3_matches_audience(v_audiences, auth.uid());
 end;
 $$;
 
@@ -1518,6 +1568,7 @@ language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare
   v_id uuid;
+  v_rule_id uuid;
   v_status text := coalesce(p_data->>'status', 'draft');
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
@@ -1572,7 +1623,8 @@ begin
     nullif(a.value->>'group_id', '')::uuid
   from jsonb_array_elements(p_audiences) with ordinality as a(value, ordinal);
 
-  delete from public.calendar_recurrence_rules where event_id = v_id;
+  -- Keep the rule row (and therefore its occurrence overrides) when an event
+  -- is edited. Only an explicit removal of the recurrence deletes the rule.
   if p_recurrence is not null and (p_recurrence->>'frequency') is not null then
     insert into public.calendar_recurrence_rules (
       event_id, frequency, interval_count, by_weekday, ends_on, occurrence_limit
@@ -1585,7 +1637,17 @@ begin
       end,
       nullif(p_recurrence->>'ends_on', '')::date,
       nullif(p_recurrence->>'occurrence_limit', '')::integer
-    );
+    )
+    on conflict (event_id) do update set
+      frequency = excluded.frequency,
+      interval_count = excluded.interval_count,
+      by_weekday = excluded.by_weekday,
+      ends_on = excluded.ends_on,
+      occurrence_limit = excluded.occurrence_limit,
+      updated_at = now()
+    returning id into v_rule_id;
+  else
+    delete from public.calendar_recurrence_rules where event_id = v_id;
   end if;
 
   perform public.phase3_log('calendar_event_saved', 'pe_calendar_events', v_id::text, p_data);
@@ -1662,7 +1724,7 @@ language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare
   v_id uuid;
-  v_directory_id uuid := public.phase3_student_directory_id();
+  v_directory_id uuid := public.current_phase3_student_directory_id();
 begin
   if v_directory_id is null then raise exception 'No active student directory record'; end if;
   if btrim(coalesce(p_body, '')) = '' then raise exception 'Enter a reply'; end if;
@@ -1702,8 +1764,9 @@ begin
     closed_at = case when p_status = 'closed' then now() else null end
   where id = p_request_id;
 
-  insert into public.feedback_status_history (request_id, from_status, to_status, actor_id, note)
-  values (p_request_id, v_request.status, p_status, auth.uid(), nullif(p_internal_note, ''));
+  -- Only public responses go into the history projection students can read.
+  insert into public.feedback_status_history (request_id, from_status, to_status, actor_id, note, is_internal)
+  values (p_request_id, v_request.status, p_status, auth.uid(), nullif(p_response, ''), false);
 
   if btrim(coalesce(p_response, '')) <> '' then
     insert into public.feedback_replies (request_id, author_id, body, is_internal)
@@ -1974,7 +2037,12 @@ begin
     where p.account_status = 'active'
       and u.email_confirmed_at is not null
       and u.email is not null
-      and public.phase3_matches_audience(p_audiences, u.id);
+      and public.phase3_matches_audience(p_audiences, u.id)
+      and not exists (
+        select 1 from public.notification_preferences np
+        where np.user_id = u.id and np.category = 'announcement'
+          and np.channel = 'email' and np.enabled = false
+      );
     get diagnostics v_recipients = row_count;
   end if;
 
@@ -2045,11 +2113,14 @@ as $$
 declare
   v_limit integer;
   v_accepted integer;
+  v_announcement_sent integer;
   v_take integer;
   v_today date := (now() at time zone 'Asia/Kolkata')::date;
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
-  if p_batch_size < 1 then raise exception 'Batch size must be positive'; end if;
+  if p_batch_size is null or p_batch_size < 1 then
+    raise exception 'Batch size must be positive';
+  end if;
 
   select daily_limit into v_limit from public.email_announcements where id = p_email_announcement_id;
   if not found then raise exception 'Email announcement not found'; end if;
@@ -2057,15 +2128,30 @@ begin
   insert into public.email_daily_usage (usage_date, accepted_count)
   values (v_today, 0) on conflict (usage_date) do nothing;
   select accepted_count into v_accepted from public.email_daily_usage where usage_date = v_today;
-  v_take := least(p_batch_size, 25, greatest(v_limit - v_accepted, 0));
+
+  -- Per-announcement limit and the global daily app cap are independent.
+  select count(*)::integer into v_announcement_sent
+  from public.email_recipients
+  where email_announcement_id = p_email_announcement_id
+    and status in ('accepted', 'delivered', 'bounced');
+
+  v_take := least(
+    p_batch_size,
+    25,
+    greatest(coalesce(v_limit, 0) - coalesce(v_accepted, 0), 0),
+    greatest(v_limit - v_announcement_sent, 0)
+  );
   if v_take = 0 then return; end if;
 
   return query
   with claimed as (
     select r.id from public.email_recipients r
     where r.email_announcement_id = p_email_announcement_id
-      and r.status in ('queued', 'failed')
       and r.attempts < 3
+      and (
+        r.status in ('queued', 'failed')
+        or (r.status = 'sending' and r.updated_at < now() - interval '15 minutes')
+      )
     order by r.queued_at, r.id
     for update skip locked
     limit v_take
@@ -2103,6 +2189,9 @@ begin
   end if;
 
   if p_provider_status = 'accepted' then
+    if btrim(coalesce(p_provider_message_id, '')) = '' then
+      raise exception 'Accepted messages require a provider message id';
+    end if;
     update public.email_recipients set
       status = 'accepted', accepted_at = now(),
       provider_message_id = p_provider_message_id, last_error = null
@@ -2110,10 +2199,22 @@ begin
     insert into public.email_daily_usage (usage_date, accepted_count)
     values (v_today, 1)
     on conflict (usage_date) do update set accepted_count = email_daily_usage.accepted_count + 1;
-  else
+  elsif p_provider_status = 'delivered' then
     update public.email_recipients set
-      status = 'failed', failed_at = now(), last_error = left(coalesce(p_error, 'Provider rejected the message'), 500)
+      status = 'delivered', delivered_at = now(), last_error = null
     where id = p_recipient_id;
+  elsif p_provider_status in ('bounced', 'complained') then
+    update public.email_recipients set
+      status = 'bounced', failed_at = now(),
+      last_error = left(coalesce(p_error, 'Provider reported a delivery failure'), 500)
+    where id = p_recipient_id;
+  elsif p_provider_status = 'failed' then
+    update public.email_recipients set
+      status = 'failed', failed_at = now(),
+      last_error = left(coalesce(p_error, 'Provider rejected the message'), 500)
+    where id = p_recipient_id;
+  else
+    raise exception 'Unknown provider status';
   end if;
 
   perform public.phase3_log('email_delivery_recorded', 'email_recipients', p_recipient_id::text,
@@ -2131,10 +2232,16 @@ declare
   v_remaining integer;
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
+  -- Exhausted failures and stale sends are terminal for this run; an admin can
+  -- explicitly requeue them. Otherwise an announcement can never complete.
   select count(*)::integer into v_remaining
   from public.email_recipients
   where email_announcement_id = p_email_announcement_id
-    and status in ('queued', 'sending', 'failed');
+    and (
+      status = 'queued'
+      or (status = 'failed' and attempts < 3)
+      or (status = 'sending' and updated_at >= now() - interval '15 minutes')
+    );
 
   update public.email_announcements set
     status = case when v_remaining = 0 then 'completed' else 'queued' end
@@ -2155,7 +2262,10 @@ begin
   update public.email_recipients
   set status = 'queued', last_error = null, updated_at = now()
   where email_announcement_id = p_email_announcement_id
-    and status = 'failed' and attempts < 3;
+    and (
+      (status = 'failed' and attempts < 3)
+      or (status = 'sending' and updated_at < now() - interval '15 minutes')
+    );
   get diagnostics v_count = row_count;
 
   update public.email_announcements set status = 'queued'
@@ -2241,7 +2351,7 @@ language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare
   v_id uuid;
-  v_directory_id uuid := public.phase3_student_directory_id();
+  v_directory_id uuid := public.current_phase3_student_directory_id();
 begin
   if v_directory_id is null then raise exception 'No active student directory record'; end if;
 
@@ -2706,7 +2816,7 @@ create policy student_groups_admin_all on public.student_groups for all to authe
 create policy student_group_members_admin_all on public.student_group_members for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy student_group_members_own_read on public.student_group_members for select to authenticated
-  using (student_directory_id = public.phase3_student_directory_id());
+  using (student_directory_id = public.current_phase3_student_directory_id());
 
 create policy equipment_categories_admin_all on public.equipment_categories for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
@@ -2726,14 +2836,14 @@ create policy equipment_assets_read on public.equipment_assets for select to aut
 create policy equipment_transactions_admin_all on public.equipment_transactions for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy equipment_transactions_own_read on public.equipment_transactions for select to authenticated
-  using (student_directory_id = public.phase3_student_directory_id());
+  using (student_directory_id = public.current_phase3_student_directory_id());
 
 create policy equipment_return_records_admin_all on public.equipment_return_records for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy equipment_return_records_own_read on public.equipment_return_records for select to authenticated
   using (exists (
     select 1 from public.equipment_transactions t
-    where t.id = transaction_id and t.student_directory_id = public.phase3_student_directory_id()
+    where t.id = transaction_id and t.student_directory_id = public.current_phase3_student_directory_id()
   ));
 
 create policy equipment_stock_adjustments_admin_all on public.equipment_stock_adjustments for all to authenticated
@@ -2746,9 +2856,9 @@ create policy equipment_qr_links_admin_all on public.equipment_qr_links for all 
 create policy pe_calendar_events_admin_all on public.pe_calendar_events for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy pe_calendar_events_visible_read on public.pe_calendar_events for select to authenticated
-  using (public.can_view_calendar_event(id, auth.uid()));
+  using (public.current_can_view_calendar_event(id));
 create policy pe_calendar_events_public_read on public.pe_calendar_events for select to anon
-  using (public.can_view_calendar_event(id, null));
+  using (public.current_can_view_calendar_event(id));
 create policy calendar_audiences_admin_all on public.calendar_audiences for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy calendar_recurrence_rules_admin_all on public.calendar_recurrence_rules for all to authenticated
@@ -2756,7 +2866,7 @@ create policy calendar_recurrence_rules_admin_all on public.calendar_recurrence_
 create policy calendar_recurrence_rules_visible_read on public.calendar_recurrence_rules for select to anon, authenticated
   using (exists (
     select 1 from public.pe_calendar_events e
-    where e.id = event_id and public.can_view_calendar_event(e.id, nullif(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid))
+    where e.id = event_id and public.current_can_view_calendar_event(e.id)
   ));
 create policy calendar_event_overrides_admin_all on public.calendar_event_overrides for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
@@ -2764,37 +2874,39 @@ create policy calendar_event_overrides_visible_read on public.calendar_event_ove
   using (exists (
     select 1 from public.calendar_recurrence_rules r
     join public.pe_calendar_events e on e.id = r.event_id
-    where r.id = rule_id and public.can_view_calendar_event(e.id, nullif(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid))
+    where r.id = rule_id and public.current_can_view_calendar_event(e.id)
   ));
 
 create policy feedback_requests_admin_all on public.feedback_requests for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy feedback_requests_own_read on public.feedback_requests for select to authenticated
-  using (student_directory_id = public.phase3_student_directory_id());
+  using (student_directory_id = public.current_phase3_student_directory_id());
 create policy feedback_requests_own_insert on public.feedback_requests for insert to authenticated
-  with check (student_directory_id = public.phase3_student_directory_id());
+  with check (student_directory_id = public.current_phase3_student_directory_id());
 
 create policy feedback_replies_admin_all on public.feedback_replies for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy feedback_replies_own_read on public.feedback_replies for select to authenticated
   using (not is_internal and exists (
     select 1 from public.feedback_requests r
-    where r.id = request_id and r.student_directory_id = public.phase3_student_directory_id()
+    where r.id = request_id and r.student_directory_id = public.current_phase3_student_directory_id()
   ));
 create policy feedback_replies_own_insert on public.feedback_replies for insert to authenticated
   with check (
     is_internal = false and author_id = auth.uid() and exists (
       select 1 from public.feedback_requests r
-      where r.id = request_id and r.student_directory_id = public.phase3_student_directory_id()
+      where r.id = request_id and r.student_directory_id = public.current_phase3_student_directory_id()
     )
   );
 create policy feedback_status_history_admin_all on public.feedback_status_history for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy feedback_status_history_own_read on public.feedback_status_history for select to authenticated
-  using (exists (
-    select 1 from public.feedback_requests r
-    where r.id = request_id and r.student_directory_id = public.phase3_student_directory_id()
-  ));
+  using (
+    is_internal = false and exists (
+      select 1 from public.feedback_requests r
+      where r.id = request_id and r.student_directory_id = public.current_phase3_student_directory_id()
+    )
+  );
 
 create policy game_rule_categories_admin_all on public.game_rule_categories for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
@@ -2814,7 +2926,7 @@ create policy game_rule_blocks_public_read on public.game_rule_blocks for select
 create policy announcements_admin_all on public.announcements for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy announcements_authenticated_read on public.announcements for select to authenticated
-  using (true);
+  using (public.current_matches_announcement(id));
 create policy announcement_audiences_admin_all on public.announcement_audiences for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 
@@ -2842,7 +2954,7 @@ create policy sports_profile_details_public_read on public.sports_profile_detail
 create policy sports_achievements_admin_all on public.sports_achievements for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy sports_achievements_own_read on public.sports_achievements for select to authenticated
-  using (student_directory_id = public.phase3_student_directory_id());
+  using (student_directory_id = public.current_phase3_student_directory_id());
 create policy sports_achievements_public_verified_read on public.sports_achievements
   for select to anon, authenticated using (
     verification_status = 'verified' and exists (
@@ -2855,7 +2967,7 @@ create policy sports_achievements_public_verified_read on public.sports_achievem
 create policy sports_participation_admin_all on public.sports_participation_records for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy sports_participation_own_read on public.sports_participation_records for select to authenticated
-  using (student_directory_id = public.phase3_student_directory_id());
+  using (student_directory_id = public.current_phase3_student_directory_id());
 
 -- ===========================================================================
 -- Grants: least privilege, with public access limited to safe projections.
@@ -2900,6 +3012,9 @@ grant select on public.game_rule_categories, public.game_rule_posts, public.game
 revoke all on function public.phase3_log(text, text, text, jsonb) from public;
 revoke all on function public.phase3_student_directory_id(uuid) from public;
 revoke all on function public.phase3_matches_audience(jsonb, uuid) from public;
+revoke all on function public.can_view_calendar_event(uuid, uuid) from public;
+revoke all on function public.student_matches_calendar(uuid, uuid) from public;
+revoke all on function public.sanitize_filename_for_phase3(text) from public;
 revoke all on function public.phase3_notify_user(uuid, text, text, text, text, text, uuid) from public;
 revoke all on function public.phase3_sync_attendance_participation() from public;
 revoke all on function public.phase3_sync_task_participation() from public;
@@ -2910,10 +3025,11 @@ revoke all on function public.record_email_provider_event(text, text, text, json
 grant execute on function public.create_phase3_upload(text, uuid, text, text, bigint, text) to authenticated;
 grant execute on function public.confirm_phase3_upload(uuid, bigint, text) to authenticated;
 grant execute on function public.authorize_phase3_download(uuid) to anon, authenticated;
-grant execute on function public.phase3_student_directory_id(uuid) to authenticated;
-grant execute on function public.phase3_matches_audience(jsonb, uuid) to authenticated;
-grant execute on function public.can_view_calendar_event(uuid, uuid) to anon, authenticated;
-grant execute on function public.student_matches_calendar(uuid, uuid) to authenticated;
+grant execute on function public.current_phase3_student_directory_id() to authenticated;
+grant execute on function public.current_phase3_matches_audience(jsonb) to authenticated;
+grant execute on function public.current_can_view_calendar_event(uuid) to anon, authenticated;
+grant execute on function public.current_matches_announcement(uuid) to authenticated;
+grant execute on function public.record_email_provider_event(text, text, text, jsonb) to service_role;
 grant execute on function public.admin_save_equipment_category(uuid, jsonb) to authenticated;
 grant execute on function public.admin_save_equipment_item(uuid, jsonb) to authenticated;
 grant execute on function public.admin_create_equipment_asset(uuid, jsonb) to authenticated;
