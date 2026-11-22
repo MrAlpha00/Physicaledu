@@ -59,14 +59,13 @@ export function CalendarBoard({ occurrences }: { occurrences: CalendarOccurrence
     })),
   ];
   const dayEvents = byDate.get(selectedDate) ?? [];
-  const upcoming = useMemo(
-    () =>
-      occurrences
-        .filter((occurrence) => new Date(occurrence.endsAt).getTime() >= now.getTime())
-        .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
-        .slice(0, 6),
-    [occurrences, now],
-  );
+  const upcoming = useMemo(() => {
+    const now = new Date();
+    return occurrences
+      .filter((occurrence) => new Date(occurrence.endsAt).getTime() >= now.getTime())
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .slice(0, 6);
+  }, [occurrences]);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(320px,1fr)_minmax(300px,0.75fr)]">
