@@ -1010,6 +1010,7 @@ begin
       sort_order = coalesce((p_data->>'sort_order')::integer, 0),
       is_active = coalesce((p_data->>'is_active')::boolean, true)
     where id = p_category_id returning id into v_id;
+    if v_id is null then raise exception 'Equipment category not found'; end if;
     perform public.phase3_log('equipment_category_updated', 'equipment_categories', v_id::text, p_data);
   end if;
 
@@ -1036,7 +1037,7 @@ begin
   if v_quantity is null or v_quantity < 1 then
     raise exception 'Quantity must be at least 1';
   end if;
-  if v_mode not in ('individual', 'bulk') then
+  if v_mode is null or v_mode not in ('individual', 'bulk') then
     raise exception 'Choose a valid tracking mode';
   end if;
 
@@ -1093,6 +1094,7 @@ begin
       image_file_id = nullif(p_data->>'image_file_id', '')::uuid,
       is_active = coalesce((p_data->>'is_active')::boolean, v_old.is_active)
     where id = p_item_id returning id into v_id;
+    if v_id is null then raise exception 'Equipment item not found'; end if;
     perform public.phase3_log('equipment_item_updated', 'equipment_items', v_id::text, p_data);
   end if;
 
@@ -1170,7 +1172,7 @@ begin
   if v_item.available_quantity + p_quantity_delta < 0 then
     raise exception 'Adjustment would create negative available stock';
   end if;
-  if v_item.available_quantity + p_quantity_delta > v_item.quantity then
+  if v_item.available_quantity + p_quantity_delta > v_item.quantity + p_quantity_delta then
     raise exception 'Adjustment exceeds registered stock';
   end if;
 
@@ -1303,7 +1305,7 @@ begin
   if v_tx.quantity_returned + p_quantity > v_tx.quantity_issued then
     raise exception 'Return quantity exceeds the issued quantity';
   end if;
-  if p_condition not in ('excellent', 'good', 'fair', 'poor', 'unusable') then
+  if p_condition is null or p_condition not in ('excellent', 'good', 'fair', 'poor', 'unusable') then
     raise exception 'Choose a valid return condition';
   end if;
 
@@ -1434,6 +1436,7 @@ begin
       expected_completion_at = nullif(p_data->>'expected_completion_at', '')::timestamptz,
       notes = nullif(p_data->>'notes', '')
     where id = p_record_id returning id into v_id;
+    if v_id is null then raise exception 'Maintenance record not found'; end if;
     perform public.phase3_log('equipment_maintenance_updated', 'equipment_maintenance_records', v_id::text, p_data);
   end if;
 
@@ -1453,7 +1456,7 @@ declare
   v_record public.equipment_maintenance_records%rowtype;
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
-  if p_status not in ('reported', 'under_review', 'scheduled', 'in_progress', 'completed', 'unrepairable', 'cancelled') then
+  if p_status is null or p_status not in ('reported', 'under_review', 'scheduled', 'in_progress', 'completed', 'unrepairable', 'cancelled') then
     raise exception 'Choose a valid maintenance status';
   end if;
 
@@ -1572,7 +1575,8 @@ declare
   v_status text := coalesce(p_data->>'status', 'draft');
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
-  if p_audiences is null or jsonb_array_length(p_audiences) = 0 then
+  if p_audiences is null or jsonb_typeof(p_audiences) <> 'array'
+     or jsonb_array_length(p_audiences) = 0 then
     raise exception 'Select at least one audience';
   end if;
   if (p_data->>'ends_at')::timestamptz <= (p_data->>'starts_at')::timestamptz then
@@ -1609,6 +1613,7 @@ begin
         else null
       end
     where id = p_event_id returning id into v_id;
+    if v_id is null then raise exception 'Calendar event not found'; end if;
 
     delete from public.calendar_audiences where event_id = v_id;
   end if;
@@ -1624,8 +1629,11 @@ begin
   from jsonb_array_elements(p_audiences) with ordinality as a(value, ordinal);
 
   -- Keep the rule row (and therefore its occurrence overrides) when an event
-  -- is edited. Only an explicit removal of the recurrence deletes the rule.
-  if p_recurrence is not null and (p_recurrence->>'frequency') is not null then
+  -- is edited without recurrence details. Only an explicit {"remove": true}
+  -- payload deletes the rule.
+  if p_recurrence is not null and coalesce((p_recurrence->>'remove')::boolean, false) then
+    delete from public.calendar_recurrence_rules where event_id = v_id;
+  elsif p_recurrence is not null and (p_recurrence->>'frequency') is not null then
     insert into public.calendar_recurrence_rules (
       event_id, frequency, interval_count, by_weekday, ends_on, occurrence_limit
     ) values (
@@ -1646,8 +1654,6 @@ begin
       occurrence_limit = excluded.occurrence_limit,
       updated_at = now()
     returning id into v_rule_id;
-  else
-    delete from public.calendar_recurrence_rules where event_id = v_id;
   end if;
 
   perform public.phase3_log('calendar_event_saved', 'pe_calendar_events', v_id::text, p_data);
@@ -1815,6 +1821,7 @@ begin
       sort_order = coalesce((p_data->>'sort_order')::integer, 0),
       is_active = coalesce((p_data->>'is_active')::boolean, true)
     where id = p_category_id returning id into v_id;
+    if v_id is null then raise exception 'Game rule category not found'; end if;
   end if;
   perform public.phase3_log('game_rule_category_saved', 'game_rule_categories', v_id::text, p_data);
   return query select * from public.game_rule_categories where id = v_id;
@@ -1834,6 +1841,12 @@ declare
   v_existing public.game_rule_posts%rowtype;
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
+  if p_data is null or p_blocks is null or jsonb_typeof(p_blocks) <> 'array' then
+    raise exception 'Invalid game rule content';
+  end if;
+  if p_data->'video_urls' is not null and jsonb_typeof(p_data->'video_urls') <> 'array' then
+    raise exception 'Video links must be a list';
+  end if;
 
   if p_post_id is not null then
     select * into v_existing from public.game_rule_posts where id = p_post_id;
@@ -1887,6 +1900,7 @@ begin
       is_pinned = coalesce((p_data->>'is_pinned')::boolean, false),
       updated_by = auth.uid()
     where id = p_post_id returning id into v_id;
+    if v_id is null then raise exception 'Game rule post not found'; end if;
 
     delete from public.game_rule_blocks where post_id = v_id;
   end if;
@@ -1927,6 +1941,7 @@ begin
       description = nullif(p_data->>'description', ''),
       is_active = coalesce((p_data->>'is_active')::boolean, true)
     where id = p_group_id returning id into v_id;
+    if v_id is null then raise exception 'Student group not found'; end if;
   end if;
   perform public.phase3_log('student_group_saved', 'student_groups', v_id::text, p_data);
   return query select * from public.student_groups where id = v_id;
@@ -2431,6 +2446,7 @@ begin
       award_description = nullif(p_data->>'award_description', ''),
       evidence_file_id = nullif(p_data->>'evidence_file_id', '')::uuid
     where id = p_achievement_id returning id into v_id;
+    if v_id is null then raise exception 'Achievement not found'; end if;
   end if;
   perform public.phase3_log('achievement_saved', 'sports_achievements', v_id::text, p_data);
   return query select * from public.sports_achievements where id = v_id;
@@ -2449,7 +2465,7 @@ declare
   v_user_id uuid;
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
-  if p_status not in ('pending', 'verified', 'rejected') then
+  if p_status is null or p_status not in ('pending', 'verified', 'rejected') then
     raise exception 'Choose a valid verification status';
   end if;
   select * into v_achievement from public.sports_achievements where id = p_achievement_id for update;

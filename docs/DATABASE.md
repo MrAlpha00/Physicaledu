@@ -126,3 +126,96 @@ Detailed workflow guides are in [PHASE_2.md](PHASE_2.md),
 [VISITOR_REGISTER.md](VISITOR_REGISTER.md),
 [ROOM_MANAGEMENT.md](ROOM_MANAGEMENT.md), [QR_SYSTEM.md](QR_SYSTEM.md) and
 [R2_SETUP.md](R2_SETUP.md).
+
+## Applying the Phase 3 migration
+
+After `0001` and `0002` are in place, run
+`supabase/migrations/0003_phase3_department_management.sql` **once** in the SQL
+Editor. It is additive only (no `DROP`, `TRUNCATE` or destructive top-level
+`DELETE`) and does not alter existing Phase 1/2 records. It was prepared locally
+in this work, never applied remotely and never used with a database reset. Apply
+it manually to a non-destructive target and verify RLS on every new table. See
+[PHASE_3_DEPLOYMENT.md](PHASE_3_DEPLOYMENT.md).
+
+### Phase 3 tables
+
+| Group | Tables |
+| --- | --- |
+| Shared files/groups | `phase3_files`, `student_groups`, `student_group_members` |
+| Equipment | `equipment_categories`, `equipment_items`, `equipment_assets`, `equipment_transactions`, `equipment_return_records`, `equipment_stock_adjustments`, `equipment_maintenance_records`, `equipment_qr_links` |
+| Calendar | `pe_calendar_events`, `calendar_audiences`, `calendar_recurrence_rules`, `calendar_event_overrides` |
+| Feedback | `feedback_requests`, `feedback_replies`, `feedback_status_history` |
+| Game rules | `game_rule_categories`, `game_rule_posts`, `game_rule_blocks` |
+| Notifications | `announcements`, `announcement_audiences`, `notifications`, `notification_preferences` |
+| Email queue | `email_announcements`, `email_recipients`, `email_delivery_events`, `email_daily_usage` |
+| Sports | `sports_profile_details`, `sports_achievements`, `sports_participation_records` |
+
+All Phase 3 tables have RLS enabled. `phase3_files` stores private R2 metadata
+with random object keys; presigned upload/download RPCs and authoritative
+confirmation are the only supported file path. `email_recipients` and
+`email_delivery_events` are PE-Admin-only; the Resend webhook writes through a
+service-role RPC. Internal helpers such as `phase3_log()`,
+`record_email_provider_event()` and the participation/notification triggers are
+not granted to ordinary authenticated callers.
+
+### Important Phase 3 functions
+
+- Identity/audience: `phase3_student_directory_id()`, caller-scoped
+  `current_phase3_student_directory_id()`, `phase3_matches_audience()`,
+  `student_matches_calendar()`, `can_view_calendar_event()`.
+- Equipment: `admin_save_equipment_category()`,
+  `admin_save_equipment_item()`, `admin_create_equipment_asset()`,
+  `admin_adjust_equipment_stock()`, `borrow_equipment()`, `return_equipment()`,
+  `admin_correct_equipment_transaction()`, `admin_save_equipment_maintenance()`,
+  `admin_set_equipment_maintenance_status()`, `admin_create_equipment_qr()`,
+  `resolve_equipment_qr()`.
+- Calendar/feedback/CMS: `admin_save_calendar_event()`,
+  `admin_save_calendar_override()`, `student_submit_feedback()`,
+  `student_reply_feedback()`, `admin_update_feedback()`,
+  `admin_save_game_rule_category()`, `admin_save_game_rule_post()`.
+- Communication: `admin_create_student_group()`, `admin_set_group_member()`,
+  `admin_create_announcement()`, `student_mark_notification_read()`,
+  `student_mark_all_notifications_read()`,
+  `student_set_notification_preference()`, `admin_claim_email_batch()`,
+  `admin_record_email_result()`, `admin_complete_email_announcement()`,
+  `admin_requeue_failed_emails()`.
+- Sports/files: `student_save_sports_profile()`,
+  `student_suggest_achievement()`, `admin_save_achievement()`,
+  `admin_review_achievement()`, `get_public_sports_profile()`,
+  `create_phase3_upload()`, `confirm_phase3_upload()`,
+  `authorize_phase3_download()`.
+
+`admin_*` functions re-check `public.is_pe_admin()` inside PostgreSQL.
+`SECURITY DEFINER` helpers use a pinned `search_path`; caller-scoped wrappers
+ignore user IDs supplied by clients. Bounded recurrence is expanded in the
+requested window and is not persisted. Email batches are capped at 25 with a
+DB-enforced Asia/Kolkata daily limit and three attempts per recipient.
+
+### Phase 3 RLS summary
+
+| Data | Student access | PE admin access |
+| --- | --- | --- |
+| Equipment catalogue | Active categories/items; asset details | All |
+| Loans/returns/maintenance/adjustments | Own transactions and return records only | All |
+| Calendar | Published events they can view; rules/overrides for those events | All |
+| Feedback | Own requests, public replies and status history | All, including internal notes |
+| Game rules | Published categories/posts/blocks and public published media | All drafts and media |
+| Announcements/notifications | Own notifications and preferences | All; queues admin-only |
+| Email queue | None | All; webhook writes via service role |
+| Sports profiles/achievements | Own profile/achievements; opt-in public projection | All |
+| Reports/exports | None | All exported source tables via role-gated API |
+
+Public reads are limited to published calendar events, published game rules,
+published game-rule media and opted-in public sports projections with verified
+achievements. No public role can read feedback, notifications, email data,
+private files, USNs or pending achievements.
+
+Module guides: [PHASE_3.md](PHASE_3.md),
+[PHASE_3_EQUIPMENT.md](PHASE_3_EQUIPMENT.md),
+[PHASE_3_CALENDAR.md](PHASE_3_CALENDAR.md),
+[PHASE_3_FEEDBACK.md](PHASE_3_FEEDBACK.md),
+[PHASE_3_GAME_RULES.md](PHASE_3_GAME_RULES.md),
+[PHASE_3_NOTIFICATIONS.md](PHASE_3_NOTIFICATIONS.md),
+[PHASE_3_EMAIL.md](PHASE_3_EMAIL.md),
+[PHASE_3_SPORTS_PROFILES.md](PHASE_3_SPORTS_PROFILES.md) and
+[PHASE_3_REPORTS.md](PHASE_3_REPORTS.md).

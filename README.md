@@ -56,15 +56,20 @@ by the provider is tracked separately.
 
    Optional: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. When
    both are set, the visitor form verifies Turnstile server-side; otherwise it
-   uses a honeypot and rate limiting. `RESEND_API_KEY`/`RESEND_FROM_EMAIL` are
-   reserved and unused.
+   uses a honeypot and rate limiting. Phase 3 email is also optional and
+   server-only: `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and
+   `RESEND_WEBHOOK_SECRET`. Without the sending keys, in-app notifications still
+   work; without the webhook secret, delivery callbacks are rejected.
 
-   See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) and
-   [docs/R2_SETUP.md](docs/R2_SETUP.md). Do not put secret keys in a
-   `NEXT_PUBLIC_` variable or in browser code.
+   See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md),
+   [docs/R2_SETUP.md](docs/R2_SETUP.md) and
+   [docs/PHASE_3_DEPLOYMENT.md](docs/PHASE_3_DEPLOYMENT.md). Do not put secret
+   keys in a `NEXT_PUBLIC_` variable or in browser code.
 
 3. Apply the database migrations in order: `0001_phase1_foundation.sql`, then
-   `0002_phase2_daily_operations.sql`. See
+   `0002_phase2_daily_operations.sql`, then the additive
+   `0003_phase3_department_management.sql`. Apply `0003` once manually after the
+   first two; it was not applied remotely during this work. See
    [docs/DATABASE.md](docs/DATABASE.md). Never reset a remote database with real
    records.
 
@@ -114,6 +119,15 @@ npm test           # Vitest unit tests
 | `/admin/visitors` | Full visitor register, corrections and `.xlsx` export |
 | `/admin/rooms`, `/admin/rooms/config` | Live occupancy, history and room setup |
 | `/admin/qr-codes`, `/admin/qr-codes/print` | QR management and A4 poster printing |
+| `/admin/equipment`, `/admin/equipment/categories`, `/admin/equipment/items`, `/admin/equipment/maintenance`, `/admin/equipment/transactions` | Equipment inventory, loans and maintenance |
+| `/equipment`, `/equipment/[token]`, `/my-equipment` | Student equipment browse, QR borrow/return and history |
+| `/admin/calendar`, `/calendar` | Event editor, bounded recurrence and public/student schedule |
+| `/admin/feedback`, `/feedback`, `/my-feedback` | Feedback triage, submission and status tracking |
+| `/admin/game-rules`, `/game-rules`, `/game-rules/[slug]` | Game rules CMS and published-only public pages |
+| `/admin/announcements`, `/admin/notifications`, `/notifications` | Announcements, email queue and student inbox |
+| `/admin/sports-profiles`, `/my-sports-profile`, `/sports-profile/[student]` | Achievement verification and opt-in public profiles |
+| `/admin/reports`, `/print/reports`, `/api/admin/exports/phase3` | Reports, print view and XLSX/CSV exports |
+| `/api/webhooks/resend` | Signed Resend delivery webhook |
 | `/unauthorized` | Permission denied page |
 
 ## Phase 1 features
@@ -155,6 +169,41 @@ npm test           # Vitest unit tests
   [ROOM_MANAGEMENT.md](docs/ROOM_MANAGEMENT.md),
   [QR_SYSTEM.md](docs/QR_SYSTEM.md), [R2_SETUP.md](docs/R2_SETUP.md).
 
+## Phase 3 features
+
+- Equipment inventory with bulk/individual tracking, issue/return ledger,
+  overdue tracking, maintenance lifecycle, stock adjustments and equipment QR
+  posters linked to the existing QR centre.
+- PE activity calendar with targeted audiences (OR semantics), bounded
+  daily/weekly/monthly recurrence, per-occurrence overrides and a guest view
+  limited to published public events.
+- Student feedback with categories, priorities, public replies, internal notes,
+  status history and in-app status notifications; damage reports can feed
+  equipment maintenance.
+- Game rules CMS with structured blocks, categories, featured/pinned posts and
+  published-only public pages. Only published game-rule media may be public;
+  the R2 bucket itself stays private.
+- Personal notification inbox with read state and per-category channel
+  preferences; targeted announcements and reusable student groups.
+- Optional Resend email queue: individual sends, no CC/BCC, Asia/Kolkata daily
+  cap, batches of at most 25, three attempts, and Svix-verified webhooks for
+  delivered/bounced/complained/failed events.
+- Student sports profiles with private-by-default opt-in, pending achievements,
+  admin verification and a public projection that excludes USNs, emails and
+  private or unverified data.
+- Recharts dashboard cards, PE-Admin reports and genuine `.xlsx`/CSV exports
+  with audited download actions and a print view.
+- Guides: [PHASE_3.md](docs/PHASE_3.md),
+  [PHASE_3_EQUIPMENT.md](docs/PHASE_3_EQUIPMENT.md),
+  [PHASE_3_CALENDAR.md](docs/PHASE_3_CALENDAR.md),
+  [PHASE_3_FEEDBACK.md](docs/PHASE_3_FEEDBACK.md),
+  [PHASE_3_GAME_RULES.md](docs/PHASE_3_GAME_RULES.md),
+  [PHASE_3_NOTIFICATIONS.md](docs/PHASE_3_NOTIFICATIONS.md),
+  [PHASE_3_EMAIL.md](docs/PHASE_3_EMAIL.md),
+  [PHASE_3_SPORTS_PROFILES.md](docs/PHASE_3_SPORTS_PROFILES.md),
+  [PHASE_3_REPORTS.md](docs/PHASE_3_REPORTS.md),
+  [PHASE_3_DEPLOYMENT.md](docs/PHASE_3_DEPLOYMENT.md).
+
 ## Architecture
 
 ```text
@@ -167,11 +216,13 @@ src/
     tables/            admin management tables
     shared/            badges, empty states
   lib/
-    actions/           file upload/download server actions
+    actions/           file upload/download server actions (Phase 2 + Phase 3)
     auth/              server-side session and role checks
     data/              grouped Supabase queries for dashboards/pages
+    email/             server-only Resend send and webhook verification
     env/               server/public environment access
-    operations/        pure attendance/task/room/visitor rules
+    export/            ExcelJS workbook and CSV builders
+    operations/        pure attendance/task/room/visitor and Phase 3 rules
     permissions/       role constants and helpers
     qr/                token destinations, themes and poster rendering
     security/          server-side Turnstile verification
@@ -181,7 +232,7 @@ src/
     utils/             normalisation, formatting, import parsing, rate limiting
     validations/       centralised Zod schemas
   types/               database and view-model types
-supabase/migrations/   phase 1 and phase 2 additive SQL migrations
+supabase/migrations/   phase 1, 2 and 3 additive SQL migrations
 docs/                  setup, database, admin and phase documentation
 tests/                 unit tests for pure logic
 ```
@@ -190,25 +241,27 @@ Privileged database operations (registration and role assignment) use
 `SUPABASE_SECRET_KEY` only from server code. All ordinary reads and writes use
 the publishable key with RLS enforced.
 
-## Planned in Phases 3–6 (not implemented here)
+## Planned in Phases 4–6 (not implemented here)
 
-Equipment inventory, issue/return and maintenance, activity calendar, feedback,
-game rules library, multiplayer games, tournaments, team registration,
-payments, email broadcast, full analytics, student sports profiles and PWA
-installation. Database and navigation design leave room for these modules, but
-no placeholder or fake working buttons have been added.
+Multiplayer games, tournaments, team registration, payments, full analytics and
+PWA installation remain out of scope. Database and navigation design leave room
+for these modules, but no placeholder or fake working buttons have been added.
 
 ## Deployment
 
 Vercel-compatible. Configure the environment variables in the project settings,
-apply both Supabase migrations in order, create the private R2 bucket and CORS
-rules, then deploy with the default `npm run build` command. Set
-`NEXT_PUBLIC_SITE_URL` to the deployed origin so email confirmation, password
-reset links and printed QR posters point to the correct host.
+apply all three Supabase migrations in order (`0003` manually and once), create
+the private R2 bucket and CORS rules, then deploy with the default
+`npm run build` command. For Phase 3 email, verify the Resend sender domain and
+configure a webhook to `<NEXT_PUBLIC_SITE_URL>/api/webhooks/resend` with a signed
+secret. Set `NEXT_PUBLIC_SITE_URL` to the deployed origin so email confirmation,
+password reset links, printed QR posters and the webhook URL point to the
+correct host. See [docs/PHASE_3_DEPLOYMENT.md](docs/PHASE_3_DEPLOYMENT.md).
 
 ## Verification status
 
-Phase 2 checks passed in this session: `npm run typecheck`, `npm run lint`,
-`npm test` (6 files / 44 tests) and `npm run build`. Migration checks are static;
-applying `0002` and live Supabase/R2/Turnstile/Realtime workflows still require
-manual verification with real services and data.
+Phase 3 checks passed in this work: `npm run typecheck`, `npm run lint`,
+`npm test` (9 files / 70 tests) and `npm run build`. Migration checks are static;
+`0003` was not applied remotely and no live Supabase, R2, Resend, Turnstile,
+Realtime or webhook workflow was verified. Real accounts, devices and service
+credentials are still required.

@@ -32,10 +32,31 @@ When both Turnstile variables are present, the visitor form requires a valid
 token. Otherwise it uses a hidden honeypot and a sliding-window rate limiter.
 The database RPC re-checks the bot-check flag in both cases.
 
-## Reserved and unused
+## Resend email (Phase 3, server-only and optional)
 
-`RESEND_API_KEY` and `RESEND_FROM_EMAIL` are placeholders in `.env.example`
-for a later phase. They are not used by Phase 1 or Phase 2.
+| Name | Scope | Purpose |
+| --- | --- | --- |
+| `RESEND_API_KEY` | Server only | API credential used to send individual announcement emails |
+| `RESEND_FROM_EMAIL` | Server only | Verified sender address |
+| `RESEND_WEBHOOK_SECRET` | Server only | Svix secret used to verify signed delivery callbacks |
+
+These names are placeholders in `.env.example`; real values belong only in the
+ignored `.env` or host project settings. Never prefix them with `NEXT_PUBLIC_`,
+import the Resend helpers into a Client Component, or display values in UI,
+logs, docs or support tickets.
+
+Email is optional. With `RESEND_API_KEY` and `RESEND_FROM_EMAIL` present, admins
+can dispatch bounded individual sends from the DB-backed queue. Without them,
+sending is disabled, `/admin/notifications` shows a configuration warning, and
+in-app notifications continue to work normally. Without
+`RESEND_WEBHOOK_SECRET`, `/api/webhooks/resend` returns 503; invalid signatures
+return 400. Provider acceptance is not treated as delivery — delivery requires
+a verified webhook event.
+
+Configure the Resend webhook in the Resend dashboard to point at
+`<NEXT_PUBLIC_SITE_URL>/api/webhooks/resend`. See
+[PHASE_3_EMAIL.md](PHASE_3_EMAIL.md) and
+[PHASE_3_DEPLOYMENT.md](PHASE_3_DEPLOYMENT.md).
 
 ## Missing variables
 
