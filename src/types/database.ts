@@ -149,7 +149,7 @@ type Phase3Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Relationships: [];
 };
 
-export interface Phase3FileRow {
+export type Phase3FileRow = {
   id: string;
   object_key: string;
   bucket: string;
@@ -164,9 +164,9 @@ export interface Phase3FileRow {
   sha256: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3StudentGroupRow {
+export type Phase3StudentGroupRow = {
   id: string;
   name: string;
   description: string | null;
@@ -174,9 +174,9 @@ export interface Phase3StudentGroupRow {
   created_by: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3EquipmentCategoryRow {
+export type Phase3EquipmentCategoryRow = {
   id: string;
   name: string;
   description: string | null;
@@ -184,9 +184,9 @@ export interface Phase3EquipmentCategoryRow {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3EquipmentItemRow {
+export type Phase3EquipmentItemRow = {
   id: string;
   category_id: string;
   name: string;
@@ -208,9 +208,9 @@ export interface Phase3EquipmentItemRow {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3EquipmentAssetRow {
+export type Phase3EquipmentAssetRow = {
   id: string;
   item_id: string;
   asset_tag: string;
@@ -221,9 +221,9 @@ export interface Phase3EquipmentAssetRow {
   notes: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3EquipmentTransactionRow {
+export type Phase3EquipmentTransactionRow = {
   id: string;
   item_id: string;
   asset_id: string | null;
@@ -244,9 +244,9 @@ export interface Phase3EquipmentTransactionRow {
   correction_reason: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3EquipmentReturnRow {
+export type Phase3EquipmentReturnRow = {
   id: string;
   transaction_id: string;
   quantity: number;
@@ -255,9 +255,9 @@ export interface Phase3EquipmentReturnRow {
   notes: string | null;
   received_by: string | null;
   returned_at: string;
-}
+};
 
-export interface Phase3MaintenanceRow {
+export type Phase3MaintenanceRow = {
   id: string;
   item_id: string;
   asset_id: string | null;
@@ -279,9 +279,9 @@ export interface Phase3MaintenanceRow {
   cost_authorised_by: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3CalendarEventRow {
+export type Phase3CalendarEventRow = {
   id: string;
   title: string;
   description: string | null;
@@ -297,9 +297,9 @@ export interface Phase3CalendarEventRow {
   published_at: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3CalendarAudienceRow {
+export type Phase3CalendarAudienceRow = {
   id: string;
   event_id: string;
   audience_type: Phase3AudienceType;
@@ -308,9 +308,9 @@ export interface Phase3CalendarAudienceRow {
   student_directory_id: string | null;
   group_id: string | null;
   created_at: string;
-}
+};
 
-export interface Phase3RecurrenceRuleRow {
+export type Phase3RecurrenceRuleRow = {
   id: string;
   event_id: string;
   frequency: RecurrenceFrequency;
@@ -320,9 +320,9 @@ export interface Phase3RecurrenceRuleRow {
   occurrence_limit: number | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3CalendarOverrideRow {
+export type Phase3CalendarOverrideRow = {
   id: string;
   rule_id: string;
   occurrence_starts_at: string;
@@ -334,9 +334,9 @@ export interface Phase3CalendarOverrideRow {
   description: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3FeedbackRequestRow {
+export type Phase3FeedbackRequestRow = {
   id: string;
   student_directory_id: string;
   subject: string;
@@ -350,18 +350,18 @@ export interface Phase3FeedbackRequestRow {
   updated_at: string;
   resolved_at: string | null;
   closed_at: string | null;
-}
+};
 
-export interface Phase3FeedbackReplyRow {
+export type Phase3FeedbackReplyRow = {
   id: string;
   request_id: string;
   author_id: string | null;
   body: string;
   is_internal: boolean;
   created_at: string;
-}
+};
 
-export interface Phase3FeedbackHistoryRow {
+export type Phase3FeedbackHistoryRow = {
   id: number;
   request_id: string;
   from_status: FeedbackStatus | null;
@@ -369,9 +369,9 @@ export interface Phase3FeedbackHistoryRow {
   actor_id: string | null;
   note: string | null;
   created_at: string;
-}
+};
 
-export interface Phase3GameRuleCategoryRow {
+export type Phase3GameRuleCategoryRow = {
   id: string;
   name: string;
   slug: string;
@@ -380,9 +380,9 @@ export interface Phase3GameRuleCategoryRow {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3GameRulePostRow {
+export type Phase3GameRulePostRow = {
   id: string;
   category_id: string | null;
   title: string;
@@ -406,9 +406,9 @@ export interface Phase3GameRulePostRow {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3GameRuleBlockRow {
+export type Phase3GameRuleBlockRow = {
   id: string;
   post_id: string;
   block_type: GameRuleBlockType;
@@ -416,9 +416,9 @@ export interface Phase3GameRuleBlockRow {
   sort_order: number;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3AnnouncementRow {
+export type Phase3AnnouncementRow = {
   id: string;
   title: string;
   message: string;
@@ -429,9 +429,9 @@ export interface Phase3AnnouncementRow {
   attachment_file_id: string | null;
   published_at: string;
   created_at: string;
-}
+};
 
-export interface Phase3NotificationRow {
+export type Phase3NotificationRow = {
   id: string;
   user_id: string;
   title: string;
@@ -442,18 +442,18 @@ export interface Phase3NotificationRow {
   announcement_id: string | null;
   read_at: string | null;
   created_at: string;
-}
+};
 
-export interface Phase3NotificationPreferenceRow {
+export type Phase3NotificationPreferenceRow = {
   id: string;
   user_id: string;
   category: NotificationCategory;
   channel: NotificationChannel;
   enabled: boolean;
   updated_at: string;
-}
+};
 
-export interface Phase3EmailAnnouncementRow {
+export type Phase3EmailAnnouncementRow = {
   id: string;
   announcement_id: string | null;
   title: string;
@@ -466,9 +466,9 @@ export interface Phase3EmailAnnouncementRow {
   created_by: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3EmailRecipientRow {
+export type Phase3EmailRecipientRow = {
   id: string;
   email_announcement_id: string;
   user_id: string;
@@ -482,9 +482,9 @@ export interface Phase3EmailRecipientRow {
   delivered_at: string | null;
   failed_at: string | null;
   updated_at: string;
-}
+};
 
-export interface Phase3SportsProfileRow {
+export type Phase3SportsProfileRow = {
   user_id: string;
   biography: string | null;
   sports_interests: string[];
@@ -493,9 +493,9 @@ export interface Phase3SportsProfileRow {
   is_public: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3AchievementRow {
+export type Phase3AchievementRow = {
   id: string;
   student_directory_id: string;
   title: string;
@@ -515,9 +515,9 @@ export interface Phase3AchievementRow {
   created_by: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Phase3ParticipationRow {
+export type Phase3ParticipationRow = {
   id: string;
   student_directory_id: string;
   source_type: "attendance" | "class_task" | "future_event" | "future_game" | "manual";
@@ -527,7 +527,7 @@ export interface Phase3ParticipationRow {
   participated_at: string;
   is_verified: boolean;
   created_at: string;
-}
+};
 
 export interface Database {
   public: {
