@@ -38,21 +38,28 @@ Resend/email broadcast is reserved for a later phase and is not used.
 2. Copy the environment template if needed (an `.env.example` with placeholders
    is included). Fill in the values in your local `.env` — never commit it.
 
-   Required in Phase 1:
+   Required:
 
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `SUPABASE_SECRET_KEY` (server-only)
+   - `NEXT_PUBLIC_SITE_URL` (canonical origin; QR posters encode it)
+   - R2 for task files: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+     `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT` (all server-only)
 
-   Optional/reserved: `NEXT_PUBLIC_SITE_URL`, `R2_ACCOUNT_ID`,
-   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`,
-   `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
-   `TURNSTILE_SECRET_KEY`.
+   Optional: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. When
+   both are set, the visitor form verifies Turnstile server-side; otherwise it
+   uses a honeypot and rate limiting. `RESEND_API_KEY`/`RESEND_FROM_EMAIL` are
+   reserved and unused.
 
-   See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md). Do not put the secret key in a
+   See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) and
+   [docs/R2_SETUP.md](docs/R2_SETUP.md). Do not put secret keys in a
    `NEXT_PUBLIC_` variable or in browser code.
 
-3. Apply the database migration: see [docs/DATABASE.md](docs/DATABASE.md).
+3. Apply the database migrations in order: `0001_phase1_foundation.sql`, then
+   `0002_phase2_daily_operations.sql`. See
+   [docs/DATABASE.md](docs/DATABASE.md). Never reset a remote database with real
+   records.
 
 4. Create the first PE administrator: see
    [docs/ADMIN_BOOTSTRAP.md](docs/ADMIN_BOOTSTRAP.md).
@@ -84,12 +91,22 @@ npm test           # Vitest unit tests
 | `/register` | Student registration |
 | `/login`, `/forgot-password`, `/reset-password` | Authentication flows |
 | `/auth/callback` | OAuth/email confirmation and recovery callback |
-| `/dashboard` | Student dashboard |
+| `/dashboard` | Student dashboard (with gated PE summary) |
 | `/profile` | Student profile and display-name settings |
-| `/admin/dashboard` | Live department metrics and recent registrations |
+| `/classroom`, `/classroom/attendance` | PE attendance and history |
+| `/tasks`, `/tasks/[taskId]` | Assigned tasks and submissions |
+| `/scan` | Student QR scanner with manual fallback |
+| `/visit/[token]`, `/visitors/today` | Public visitor form and privacy-safe board |
+| `/room/[token]` | Room entry/exit QR workflow |
+| `/admin/dashboard` | Live department and daily operations metrics |
 | `/admin/students` | Accounts, official directory, import and manual records |
 | `/admin/pe-roster` | Active PE membership management |
 | `/admin/departments` | Department configuration |
+| `/admin/classroom/attendance` | Attendance sessions and live board |
+| `/admin/classroom/tasks` | Task creation, submissions and review |
+| `/admin/visitors` | Full visitor register, corrections and `.xlsx` export |
+| `/admin/rooms`, `/admin/rooms/config` | Live occupancy, history and room setup |
+| `/admin/qr-codes`, `/admin/qr-codes/print` | QR management and A4 poster printing |
 | `/unauthorized` | Permission denied page |
 
 ## Phase 1 features
