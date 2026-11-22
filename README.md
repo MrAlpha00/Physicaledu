@@ -20,11 +20,12 @@ with real records only.
 | Forms | React Hook Form, Zod, `@hookform/resolvers` |
 | Backend | Supabase PostgreSQL, Supabase Auth, Row Level Security |
 | Auth integration | `@supabase/ssr` (cookies + proxy session refresh) |
+| Files & QR | Cloudflare R2, ExcelJS, JSZip, `qrcode`, `sharp`, `@zxing/browser` |
+| Forms & abuse control | Cloudflare Turnstile (optional), honeypot + rate limiting |
 | Hosting | Vercel-compatible |
 | Testing | Vitest (pure logic), TypeScript, ESLint, production build |
 
-Reserved for later phases (not used in Phase 1): Cloudflare R2, Resend,
-Cloudflare Turnstile.
+Resend/email broadcast is reserved for a later phase and is not used.
 
 ## Setup
 
