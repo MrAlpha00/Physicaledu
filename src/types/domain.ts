@@ -41,6 +41,7 @@ export interface DirectoryRow {
     id: string;
     status: MembershipStatus;
     enrolledAt: string;
+    endedAt: string | null;
   } | null;
 }
 

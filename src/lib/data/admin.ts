@@ -1,5 +1,8 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
+
+type MembershipRow = Database["public"]["Tables"]["pe_memberships"]["Row"];
 import type {
   AdminMetrics,
   DepartmentOption,
@@ -100,8 +103,7 @@ export const getDirectoryRows = cache(async (): Promise<DirectoryRow[]> => {
         .not("student_directory_id", "is", null),
       supabase
         .from("pe_memberships")
-        .select("id, student_directory_id, enrolled_at")
-        .eq("status", "active"),
+        .select("id, student_directory_id, enrolled_at, ended_at, status"),
     ]);
 
   const departmentMap = new Map(
@@ -113,9 +115,13 @@ export const getDirectoryRows = cache(async (): Promise<DirectoryRow[]> => {
   const profileMap = new Map(
     (profiles ?? []).map((profile) => [profile.student_directory_id, profile]),
   );
-  const membershipMap = new Map(
-    (memberships ?? []).map((membership) => [membership.student_directory_id, membership]),
-  );
+  const membershipMap = new Map<string, MembershipRow>();
+  (memberships ?? []).forEach((membership) => {
+    const existing = membershipMap.get(membership.student_directory_id);
+    if (!existing || (membership.status === "active" && existing.status !== "active")) {
+      membershipMap.set(membership.student_directory_id, membership);
+    }
+  });
 
   return (directory ?? []).map((row) => {
     const profile = profileMap.get(row.id);
@@ -145,8 +151,9 @@ export const getDirectoryRows = cache(async (): Promise<DirectoryRow[]> => {
       membership: membership
         ? {
             id: membership.id,
-            status: "active",
+            status: membership.status,
             enrolledAt: membership.enrolled_at,
+            endedAt: membership.ended_at,
           }
         : null,
     };
