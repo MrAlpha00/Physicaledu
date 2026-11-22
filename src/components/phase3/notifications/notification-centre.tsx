@@ -56,7 +56,7 @@ export function NotificationCentre({
 
   const visible = filter === "unread" ? notifications.filter((item) => !item.readAt) : notifications;
 
-  function run(action: () => Promise<ActionState>, onSuccess?: () => void) {
+  function run(action: () => Promise<ActionState>, onSuccess?: () => void, onError?: () => void) {
     setNotice(null);
     startTransition(async () => {
       const result = await action();
@@ -64,6 +64,8 @@ export function NotificationCentre({
       if (result.status === "success") {
         onSuccess?.();
         router.refresh();
+      } else {
+        onError?.();
       }
     });
   }
@@ -202,7 +204,11 @@ export function NotificationCentre({
                           onChange={(event) => {
                             const enabled = event.target.checked;
                             setOverrides((current) => ({ ...current, [`${category}:${channel}`]: enabled }));
-                            run(() => setNotificationPreference({ category, channel, enabled }));
+                            run(
+                              () => setNotificationPreference({ category, channel, enabled }),
+                              undefined,
+                              () => setOverrides((current) => ({ ...current, [`${category}:${channel}`]: !enabled })),
+                            );
                           }}
                         />
                       </td>

@@ -28,7 +28,7 @@ function audienceLabel(row: AudienceRow, departments: DepartmentOption[], studen
   switch (row.audienceType) {
     case "all_students": return "All students";
     case "active_pe": return "Active PE students";
-    case "department": return `Department ${departments.find((item) => item.id === row.departmentId)?.code ?? row.departmentId || "—"}`;
+    case "department": return `Department ${departments.find((item) => item.id === row.departmentId)?.code ?? (row.departmentId || "—")}`;
     case "semester": return `Semester ${row.semester || "—"}`;
     case "selected_students": return students.find((item) => item.id === row.studentDirectoryId)?.full_name ?? "Choose a student";
     case "group": return groups.find((item) => item.id === row.groupId)?.name ?? "Choose a group";
