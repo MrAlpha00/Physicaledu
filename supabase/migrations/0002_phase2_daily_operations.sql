@@ -890,6 +890,12 @@ begin
   if p_due_at <= p_starts_at then
     raise exception 'Deadline must be after the start date' using errcode = '22023';
   end if;
+  if p_status not in ('draft', 'published', 'closed', 'archived') then
+    raise exception 'Invalid task status' using errcode = '22023';
+  end if;
+  if p_max_files not between 0 and 10 or p_max_file_size_bytes <= 0 then
+    raise exception 'Invalid file attachment settings' using errcode = '22023';
+  end if;
   if jsonb_typeof(p_audiences) <> 'array' or jsonb_array_length(p_audiences) = 0 then
     raise exception 'Select at least one target audience' using errcode = '22023';
   end if;
@@ -1196,15 +1202,19 @@ begin
   if p_verified_size <= 0 or p_verified_size > v_file.byte_size then
     raise exception 'Uploaded object size does not match the authorised upload' using errcode = '22023';
   end if;
-  if v_task.max_file_size_bytes is not null and p_verified_size > v_task.max_file_size_bytes then
-    raise exception 'File exceeds the task size limit' using errcode = '22023';
-  end if;
 
   if v_file.parent_type = 'task_reference' then
     select * into v_task from public.class_tasks where id = v_file.parent_id;
   else
     select t.* into v_task from public.class_tasks t
     join public.task_submissions s on s.task_id = t.id where s.id = v_file.parent_id;
+  end if;
+  if not found then
+    raise exception 'Task for this upload was not found' using errcode = '22023';
+  end if;
+  if v_task.max_file_size_bytes is not null
+      and p_verified_size > v_task.max_file_size_bytes then
+    raise exception 'File exceeds the task size limit' using errcode = '22023';
   end if;
 
   update public.stored_files
@@ -1249,6 +1259,7 @@ declare
   v_purpose public.visitor_purposes;
   v_profile public.profiles;
   v_directory public.student_directory;
+  v_directory_id uuid;
   v_visitor uuid;
   v_name text;
   v_usn text;
@@ -1287,6 +1298,7 @@ begin
       select * into v_directory from public.student_directory
       where id = v_profile.student_directory_id and is_active;
       if found then
+        v_directory_id := v_directory.id;
         v_usn := v_directory.usn;
         v_dept := v_directory.department_id;
         v_year := v_directory.academic_year;
@@ -1320,7 +1332,7 @@ begin
     description, identity_source, bot_check_passed, visited_at
   )
   values (
-    v_qr.id, v_user, v_directory.id, v_name, v_usn,
+    v_qr.id, v_user, v_directory_id, v_name, v_usn,
     v_dept, v_year, v_sem, v_purpose.id,
     nullif(btrim(coalesce(p_purpose_detail, '')), ''),
     nullif(btrim(coalesce(p_description, '')), ''),
@@ -1402,6 +1414,7 @@ declare
   v_qr public.qr_codes;
   v_room public.pe_rooms;
   v_activity public.room_activities;
+  v_activity_name text;
   v_directory uuid;
   v_session public.room_sessions;
 begin
@@ -1431,14 +1444,15 @@ begin
     select * into v_activity from public.room_activities
     where id = p_activity_id and room_id = v_room.id and is_active;
     if not found then raise exception 'Invalid activity for this room' using errcode = '22023'; end if;
+    v_activity_name := v_activity.name;
   end if;
 
   insert into public.room_sessions (room_id, user_id, student_directory_id, activity_id, activity_name, started_at)
-  values (v_room.id, v_user, v_directory, p_activity_id, v_activity.name, now())
+  values (v_room.id, v_user, v_directory, p_activity_id, v_activity_name, now())
   returning * into v_session;
 
   perform public.write_audit('room_session_started', 'room_sessions', v_session.id::text,
-    jsonb_build_object('room_id', v_room.id, 'activity', v_activity.name));
+    jsonb_build_object('room_id', v_room.id, 'activity', v_activity_name));
 
   return query select * from public.room_sessions where id = v_session.id;
 end;
