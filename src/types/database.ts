@@ -1341,6 +1341,30 @@ export interface Database {
         Args: { p_qr_id: string };
         Returns: Database["public"]["Tables"]["qr_codes"]["Row"][];
       };
+      create_phase3_upload: {
+        Args: {
+          p_parent_type: Phase3ParentType;
+          p_parent_id: string;
+          p_original_filename: string;
+          p_content_type: string;
+          p_byte_size: number;
+          p_visibility?: "private" | "public";
+        };
+        Returns: Array<{ file_id: string; object_key: string }>;
+      };
+      confirm_phase3_upload: {
+        Args: { p_file_id: string; p_verified_size: number; p_verified_content_type: string };
+        Returns: Phase3FileRow[];
+      };
+      authorize_phase3_download: {
+        Args: { p_file_id: string };
+        Returns: Array<{
+          object_key: string;
+          content_type: string;
+          original_filename: string;
+          byte_size: number;
+        }>;
+      };
       phase3_student_directory_id: { Args: { p_user_id?: string }; Returns: string | null };
       phase3_matches_audience: { Args: { p_audiences: Json; p_user_id?: string }; Returns: boolean };
       can_view_calendar_event: { Args: { p_event_id: string; p_user_id?: string | null }; Returns: boolean };

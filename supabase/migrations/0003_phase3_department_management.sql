@@ -2482,6 +2482,169 @@ after insert or update of status on public.class_tasks
 for each row execute function public.phase3_notify_task_published();
 
 -- ===========================================================================
+-- Private-by-default R2 metadata. Random object keys are generated here;
+-- original filenames are metadata only and never become storage paths.
+-- ===========================================================================
+
+create or replace function public.sanitize_filename_for_phase3(p_filename text)
+returns text language sql immutable set search_path = public, pg_temp
+as $$
+  select coalesce(nullif(btrim(regexp_replace(
+    split_part(btrim(p_filename), '.', 1),
+    '[^a-zA-Z0-9._ -]', '-', 'g'
+  )), ''), 'file');
+$$;
+
+create or replace function public.create_phase3_upload(
+  p_parent_type text,
+  p_parent_id uuid,
+  p_original_filename text,
+  p_content_type text,
+  p_byte_size bigint,
+  p_visibility text default 'private'
+) returns table (file_id uuid, object_key text)
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_admin boolean := public.is_pe_admin();
+  v_extension text;
+  v_directory uuid;
+  v_key text;
+  v_id uuid;
+begin
+  if v_user is null then raise exception 'Authentication required'; end if;
+  if btrim(coalesce(p_original_filename, '')) = '' then raise exception 'Choose a file'; end if;
+  if p_byte_size is null or p_byte_size <= 0 or p_byte_size > 20971520 then
+    raise exception 'File must be between 1 byte and 20 MB';
+  end if;
+  if p_content_type is null or p_content_type not in (
+    'application/pdf', 'image/jpeg', 'image/png', 'image/webp',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain'
+  ) then raise exception 'Unsupported file type'; end if;
+
+  if p_parent_type in ('equipment_image', 'maintenance_photo', 'calendar_attachment',
+      'game_rule_image', 'game_rule_document', 'announcement_attachment') and not v_admin then
+    raise exception 'PE Admin access required for this file';
+  end if;
+  if p_visibility = 'public' and (not v_admin or p_parent_type not in ('game_rule_image', 'game_rule_document')) then
+    raise exception 'Public file visibility is restricted to published game content';
+  end if;
+
+  v_directory := public.phase3_student_directory_id(v_user);
+  if p_parent_type = 'feedback_attachment' and not v_admin and not exists (
+    select 1 from public.feedback_requests r
+    where r.id = p_parent_id and r.student_directory_id = v_directory
+  ) then raise exception 'Feedback request not found'; end if;
+  if p_parent_type = 'achievement_evidence' and not v_admin and not exists (
+    select 1 from public.sports_achievements a
+    where a.id = p_parent_id and a.student_directory_id = v_directory
+  ) then raise exception 'Achievement not found'; end if;
+  -- The parent id for a profile photo is the user's own id.
+  if p_parent_type = 'sports_profile_photo' and not v_admin and p_parent_id <> v_user then
+    raise exception 'Profile photo parent is invalid';
+  end if;
+
+  v_extension := lower(split_part(reverse(split_part(reverse(p_original_filename), '.', 1)), '.', 1));
+  if length(v_extension) > 6 or v_extension !~ '^[a-z0-9]+$' then v_extension := 'bin'; end if;
+  v_key := 'phase3/' || p_parent_type || '/' || p_parent_id::text || '/' || gen_random_uuid()::text || '.' || v_extension;
+
+  insert into public.phase3_files (
+    object_key, original_filename, content_type, byte_size, uploader_id,
+    parent_type, parent_id, visibility, upload_status
+  ) values (
+    v_key, public.sanitize_filename_for_phase3(p_original_filename), p_content_type,
+    p_byte_size, v_user, p_parent_type, p_parent_id,
+    coalesce(p_visibility, 'private'), 'pending'
+  ) returning id into v_id;
+
+  return query select v_id, v_key;
+end;
+$$;
+
+create or replace function public.confirm_phase3_upload(
+  p_file_id uuid,
+  p_verified_size bigint,
+  p_verified_content_type text
+) returns setof public.phase3_files
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  v_file public.phase3_files%rowtype;
+begin
+  select * into v_file from public.phase3_files where id = p_file_id for update;
+  if not found or v_file.uploader_id <> auth.uid() then
+    raise exception 'Upload record not found';
+  end if;
+  if v_file.upload_status <> 'pending' then
+    return query select * from public.phase3_files where id = p_file_id;
+    return;
+  end if;
+  if p_verified_size <= 0 or p_verified_size > v_file.byte_size then
+    raise exception 'Uploaded file size does not match the authorised size';
+  end if;
+  if p_verified_content_type is distinct from v_file.content_type then
+    raise exception 'Uploaded file content type does not match the authorised type';
+  end if;
+
+  update public.phase3_files
+  set upload_status = 'confirmed', byte_size = p_verified_size
+  where id = p_file_id;
+  return query select * from public.phase3_files where id = p_file_id;
+end;
+$$;
+
+create or replace function public.authorize_phase3_download(p_file_id uuid)
+returns table (object_key text, content_type text, original_filename text, byte_size bigint)
+language plpgsql security definer stable set search_path = public, pg_temp
+as $$
+declare
+  v_file public.phase3_files%rowtype;
+  v_user uuid := auth.uid();
+  v_admin boolean := public.is_pe_admin();
+  v_directory uuid;
+  v_allowed boolean := false;
+begin
+  select * into v_file from public.phase3_files where id = p_file_id;
+  if not found or v_file.upload_status <> 'confirmed' then return; end if;
+
+  if v_admin or (v_user is not null and v_file.uploader_id = v_user) then
+    v_allowed := true;
+  elsif v_file.visibility = 'public' and v_file.parent_type in ('game_rule_image', 'game_rule_document') then
+    select exists (
+      select 1 from public.game_rule_posts p
+      where p.id = v_file.parent_id and p.status = 'published'
+    ) into v_allowed;
+  elsif v_file.parent_type = 'sports_profile_photo' then
+    select exists (
+      select 1 from public.sports_profile_details s
+      where s.profile_photo_file_id = v_file.id and s.is_public
+    ) into v_allowed;
+  elsif v_user is not null then
+    v_directory := public.phase3_student_directory_id(v_user);
+    if v_file.parent_type = 'feedback_attachment' then
+      select exists (
+        select 1 from public.feedback_requests r
+        where r.id = v_file.parent_id and r.student_directory_id = v_directory
+      ) into v_allowed;
+    elsif v_file.parent_type = 'achievement_evidence' then
+      select exists (
+        select 1 from public.sports_achievements a
+        where a.id = v_file.parent_id and a.student_directory_id = v_directory
+      ) into v_allowed;
+    elsif v_file.parent_type = 'calendar_attachment' then
+      select public.can_view_calendar_event(v_file.parent_id, v_user) into v_allowed;
+    end if;
+  end if;
+
+  if not v_allowed then return; end if;
+  return query select v_file.object_key, v_file.content_type, v_file.original_filename, v_file.byte_size;
+end;
+$$;
+
+-- ===========================================================================
 -- Row Level Security. Every exposed Phase 3 table is enabled; UI hiding is
 -- never the security boundary.
 -- ===========================================================================
@@ -2744,6 +2907,9 @@ revoke all on function public.phase3_notify_attendance_review() from public;
 revoke all on function public.phase3_notify_task_published() from public;
 revoke all on function public.record_email_provider_event(text, text, text, jsonb) from public;
 
+grant execute on function public.create_phase3_upload(text, uuid, text, text, bigint, text) to authenticated;
+grant execute on function public.confirm_phase3_upload(uuid, bigint, text) to authenticated;
+grant execute on function public.authorize_phase3_download(uuid) to anon, authenticated;
 grant execute on function public.phase3_student_directory_id(uuid) to authenticated;
 grant execute on function public.phase3_matches_audience(jsonb, uuid) to authenticated;
 grant execute on function public.can_view_calendar_event(uuid, uuid) to anon, authenticated;
