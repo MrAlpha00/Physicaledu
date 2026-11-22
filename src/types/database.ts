@@ -638,6 +638,15 @@ export interface Database {
         Returns: Json;
       };
       is_active_pe_student: { Args: { p_user_id?: string }; Returns: boolean };
+      write_audit: {
+        Args: {
+          p_action: string;
+          p_target_table: string;
+          p_target_id?: string | null;
+          p_details?: Json | null;
+        };
+        Returns: undefined;
+      };
       student_matches_task: {
         Args: { p_task_id: string; p_user_id?: string };
         Returns: boolean;
