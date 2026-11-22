@@ -1,5 +1,4 @@
 import type { QrType } from "@/types/database";
-import type { RoomOccupancyEntry } from "@/types/domain";
 
 export const ROOM_QR_TYPES: QrType[] = ["playing_room", "gym_room", "mental_games_room"];
 
@@ -34,8 +33,9 @@ export function annotateOccupancy<T extends { startedAt: string; roomId: string 
   });
 }
 
-export function totalOccupancy(entries: RoomOccupancyEntry[]): number {
-  return entries.filter((entry) => !entry.endedAt).length;
+/** Occupancy entries are active sessions by definition; count them directly. */
+export function totalOccupancy(entries: readonly unknown[]): number {
+  return entries.length;
 }
 
 export function describeRoomError(message: string): string {

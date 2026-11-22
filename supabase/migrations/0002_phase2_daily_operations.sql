@@ -61,49 +61,6 @@ as $$
   );
 $$;
 
--- OR-based task targeting: a student is eligible when at least one audience row
--- matches. This keeps the model explicit and avoids ambiguous combined rules.
-create or replace function public.student_matches_task(p_task_id uuid, p_user_id uuid default auth.uid())
-returns boolean
-language sql
-security definer
-stable
-set search_path = public, pg_temp
-as $$
-  select exists (
-    select 1
-    from public.task_audiences ta
-    where ta.task_id = p_task_id
-      and (
-        ta.audience_type = 'all_students'
-        or (
-          ta.audience_type = 'active_pe'
-          and public.is_active_pe_student(p_user_id)
-        )
-        or (
-          ta.audience_type = 'department'
-          and exists (
-            select 1 from public.profiles p
-            join public.student_directory sd on sd.id = p.student_directory_id
-            where p.id = p_user_id and sd.department_id = ta.department_id
-          )
-        )
-        or (
-          ta.audience_type = 'semester'
-          and exists (
-            select 1 from public.profiles p
-            join public.student_directory sd on sd.id = p.student_directory_id
-            where p.id = p_user_id and sd.semester = ta.semester
-          )
-        )
-        or (
-          ta.audience_type = 'selected_students'
-          and ta.student_directory_id = public.student_directory_id_for_user(p_user_id)
-        )
-      )
-  );
-$$;
-
 -- Internal audit writer. Explicit calls keep decision history compact and
 -- avoid copying raw QR tokens or whole visitor records into audit_logs.
 create or replace function public.write_audit(
@@ -270,6 +227,50 @@ create unique index task_audiences_unique_target_idx
     coalesce(semester, 0),
     coalesce(student_directory_id, '00000000-0000-0000-0000-000000000000'::uuid)
   );
+
+-- OR-based task targeting: a student is eligible when at least one audience row
+-- matches. Defined after task_audiences so the SQL body can be validated at
+-- migration time.
+create or replace function public.student_matches_task(p_task_id uuid, p_user_id uuid default auth.uid())
+returns boolean
+language sql
+security definer
+stable
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1
+    from public.task_audiences ta
+    where ta.task_id = p_task_id
+      and (
+        ta.audience_type = 'all_students'
+        or (
+          ta.audience_type = 'active_pe'
+          and public.is_active_pe_student(p_user_id)
+        )
+        or (
+          ta.audience_type = 'department'
+          and exists (
+            select 1 from public.profiles p
+            join public.student_directory sd on sd.id = p.student_directory_id
+            where p.id = p_user_id and sd.department_id = ta.department_id
+          )
+        )
+        or (
+          ta.audience_type = 'semester'
+          and exists (
+            select 1 from public.profiles p
+            join public.student_directory sd on sd.id = p.student_directory_id
+            where p.id = p_user_id and sd.semester = ta.semester
+          )
+        )
+        or (
+          ta.audience_type = 'selected_students'
+          and ta.student_directory_id = public.student_directory_id_for_user(p_user_id)
+        )
+      )
+  );
+$$;
 
 create table public.task_submissions (
   id uuid primary key default gen_random_uuid(),

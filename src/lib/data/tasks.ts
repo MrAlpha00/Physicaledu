@@ -198,6 +198,7 @@ export const getMyTasks = cache(async (user: User): Promise<MyTaskView[]> => {
       ...toTaskView(task, [], 0),
       submission: submission
         ? {
+            id: submission.id,
             status: submission.status,
             displayStatus: displaySubmissionStatus(submission.status, task.due_at),
             textContent: submission.text_content,
@@ -235,6 +236,7 @@ export const getMyTask = cache(async (taskId: string): Promise<MyTaskView | null
     ...toTaskView(task, [], files?.length ?? 0),
     submission: submission
       ? {
+          id: submission.id,
           status: submission.status,
           displayStatus: displaySubmissionStatus(submission.status, task.due_at),
           textContent: submission.text_content,

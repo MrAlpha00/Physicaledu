@@ -58,6 +58,22 @@ export function istDayEnd(dateString: string): Date {
   return new Date(`${addIstDays(dateString, 1)}T00:00:00+05:30`);
 }
 
+/** Format an instant as a datetime-local value using Asia/Kolkata. */
+export function toIstLocalInput(value: string | Date): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
 /** Convert a datetime-local input value into an IST timestamptz string. */
 export function istLocalInputToIso(value: string): string {
   const normalized = value.length === 16 ? `${value}:00` : value;

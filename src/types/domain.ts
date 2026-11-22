@@ -259,6 +259,7 @@ export interface TaskSubmissionView {
 
 export interface MyTaskView extends ClassTaskView {
   submission: {
+    id: string;
     status: TaskSubmissionStatus;
     displayStatus: TaskSubmissionStatus | "overdue";
     textContent: string | null;

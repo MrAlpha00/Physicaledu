@@ -19,8 +19,14 @@ export interface Phase2AdminMetrics {
 export const getPhase2AdminMetrics = cache(async (): Promise<Phase2AdminMetrics> => {
   const supabase = await createClient();
   const today = istDateString();
-  const [{ data: session }, { data: records }, visitors, occupancy, tasks, submissions] =
-    await Promise.all([
+  const [
+    { data: session },
+    { data: records },
+    visitors,
+    occupancy,
+    { data: tasks },
+    { data: submissions },
+  ] = await Promise.all([
       supabase
         .from("attendance_sessions")
         .select("id, title")
