@@ -183,18 +183,25 @@ Privileged database operations (registration and role assignment) use
 `SUPABASE_SECRET_KEY` only from server code. All ordinary reads and writes use
 the publishable key with RLS enforced.
 
-## Planned in later phases (not implemented here)
+## Planned in Phases 3–6 (not implemented here)
 
-Digital classroom and attendance, assignments, visitor register, room QR,
-games and challenges, events and tournaments, team payments, brackets,
-announcements, rules library, equipment registers, QR printing, reports and
-exports, activity calendar, feedback, student sports profiles, PWA installation.
-Navigation and database design leave room for these modules, but no placeholder
-or fake working buttons have been added.
+Equipment inventory, issue/return and maintenance, activity calendar, feedback,
+game rules library, multiplayer games, tournaments, team registration,
+payments, email broadcast, full analytics, student sports profiles and PWA
+installation. Database and navigation design leave room for these modules, but
+no placeholder or fake working buttons have been added.
 
 ## Deployment
 
 Vercel-compatible. Configure the environment variables in the project settings,
-apply the Supabase migration, then deploy with the default `npm run build`
-command. Set `NEXT_PUBLIC_SITE_URL` to the deployed origin so email confirmation
-and password reset links return to the correct host.
+apply both Supabase migrations in order, create the private R2 bucket and CORS
+rules, then deploy with the default `npm run build` command. Set
+`NEXT_PUBLIC_SITE_URL` to the deployed origin so email confirmation, password
+reset links and printed QR posters point to the correct host.
+
+## Verification status
+
+Phase 2 checks passed in this session: `npm run typecheck`, `npm run lint`,
+`npm test` (6 files / 44 tests) and `npm run build`. Migration checks are static;
+applying `0002` and live Supabase/R2/Turnstile/Realtime workflows still require
+manual verification with real services and data.
