@@ -1529,6 +1529,15 @@ export interface Database {
         Args: { p_email_announcement_id: string };
         Returns: number;
       };
+      record_email_provider_event: {
+        Args: {
+          p_provider_message_id: string;
+          p_event_type: string;
+          p_provider_event_id: string;
+          p_payload?: Json;
+        };
+        Returns: undefined;
+      };
       student_save_sports_profile: { Args: { p_data: Json }; Returns: Phase3SportsProfileRow[] };
       student_suggest_achievement: { Args: { p_data: Json }; Returns: Phase3AchievementRow[] };
       admin_save_achievement: {

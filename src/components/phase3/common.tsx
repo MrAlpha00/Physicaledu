@@ -75,6 +75,6 @@ export function Phase3Notice({ children, tone = "info" }: { children: React.Reac
 }
 
 export function Phase3StatusBadge({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "good" | "warn" | "bad" | "info" }) {
-  const variant = tone === "good" ? "success" : tone === "bad" ? "destructive" : tone === "warn" ? "warning" : tone === "info" ? "info" : "outline";
+  const variant = tone === "good" ? "lime" : tone === "bad" ? "coral" : tone === "warn" ? "coral" : tone === "info" ? "cobalt" : "muted";
   return <Badge variant={variant} className="capitalize">{label.replaceAll("_", " ")}</Badge>;
 }
