@@ -30,8 +30,8 @@ export const registrationSchema = z
       .regex(/^[A-Za-z0-9][A-Za-z0-9\-/._\s]*$/, "Enter a valid USN"),
     email: emailSchema,
     departmentId: z.string().uuid("Select your department"),
-    academicYear: z.coerce.number().int().min(1).max(6),
-    semester: z.coerce.number().int().min(1).max(12),
+    academicYear: z.number().int().min(1).max(6),
+    semester: z.number().int().min(1).max(12),
     password: passwordSchema,
     confirmPassword: z.string().min(1, "Confirm your password"),
   })

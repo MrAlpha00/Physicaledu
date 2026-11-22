@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     } else if (tokenHash && type) {
       const result = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
-        type: type as AuthOtpType,
+        type: type as Parameters<typeof supabase.auth.verifyOtp>[0]["type"],
       });
       error = result.error;
     }

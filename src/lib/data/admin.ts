@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
 type MembershipRow = Database["public"]["Tables"]["pe_memberships"]["Row"];
+type MembershipLite = Pick<
+  MembershipRow,
+  "id" | "student_directory_id" | "status" | "enrolled_at" | "ended_at"
+>;
 import type {
   AdminMetrics,
   DepartmentOption,
@@ -115,7 +119,7 @@ export const getDirectoryRows = cache(async (): Promise<DirectoryRow[]> => {
   const profileMap = new Map(
     (profiles ?? []).map((profile) => [profile.student_directory_id, profile]),
   );
-  const membershipMap = new Map<string, MembershipRow>();
+  const membershipMap = new Map<string, MembershipLite>();
   (memberships ?? []).forEach((membership) => {
     const existing = membershipMap.get(membership.student_directory_id);
     if (!existing || (membership.status === "active" && existing.status !== "active")) {

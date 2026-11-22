@@ -25,8 +25,8 @@ export const manualStudentSchema = z.object({
     .regex(/^[A-Za-z0-9][A-Za-z0-9\-/._\s]*$/, "Enter a valid USN"),
   fullName: z.string().trim().min(2, "Full name is required").max(120),
   departmentId: z.string().uuid("Select a department"),
-  academicYear: z.coerce.number().int().min(1).max(6),
-  semester: z.coerce.number().int().min(1).max(12),
+  academicYear: z.number().int().min(1).max(6),
+  semester: z.number().int().min(1).max(12),
   officialEmail: z
     .string()
     .trim()
