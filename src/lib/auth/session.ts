@@ -10,7 +10,7 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});
 
 export async function getMyRoles(userId?: string): Promise<AppRole[]> {
   const supabase = await createClient();
