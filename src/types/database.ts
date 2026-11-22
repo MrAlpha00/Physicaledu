@@ -1356,6 +1356,10 @@ export interface Database {
         Args: { p_file_id: string; p_verified_size: number; p_verified_content_type: string };
         Returns: Phase3FileRow[];
       };
+      student_attach_phase3_file: {
+        Args: { p_parent_type: "feedback_attachment" | "achievement_evidence"; p_parent_id: string; p_file_id: string };
+        Returns: undefined;
+      };
       authorize_phase3_download: {
         Args: { p_file_id: string };
         Returns: Array<{

@@ -2780,6 +2780,43 @@ begin
 end;
 $$;
 
+-- Students upload files after the parent record exists. This narrow RPC links
+-- only their own confirmed file to their own feedback or pending achievement.
+create or replace function public.student_attach_phase3_file(
+  p_parent_type text,
+  p_parent_id uuid,
+  p_file_id uuid
+) returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  v_directory uuid := public.current_phase3_student_directory_id();
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  if p_parent_type not in ('feedback_attachment', 'achievement_evidence') then
+    raise exception 'Unsupported attachment type';
+  end if;
+  if not exists (
+    select 1 from public.phase3_files f
+    where f.id = p_file_id and f.uploader_id = auth.uid()
+      and f.parent_type = p_parent_type and f.parent_id = p_parent_id
+      and f.upload_status = 'confirmed'
+  ) then raise exception 'Upload the file for this record first'; end if;
+
+  if p_parent_type = 'feedback_attachment' then
+    update public.feedback_requests
+    set attachment_file_id = p_file_id, updated_at = now()
+    where id = p_parent_id and student_directory_id = v_directory;
+  else
+    update public.sports_achievements
+    set evidence_file_id = p_file_id, updated_at = now()
+    where id = p_parent_id and student_directory_id = v_directory
+      and verification_status = 'pending';
+  end if;
+  if not found then raise exception 'Record not found or not yours'; end if;
+end;
+$$;
+
 create or replace function public.authorize_phase3_download(p_file_id uuid)
 returns table (object_key text, content_type text, original_filename text, byte_size bigint)
 language plpgsql security definer stable set search_path = public, pg_temp
@@ -2870,15 +2907,10 @@ create policy phase3_files_uploader_read on public.phase3_files for select to au
 create policy phase3_files_public_read on public.phase3_files for select to anon, authenticated
   using (
     upload_status = 'confirmed' and visibility = 'public'
-    and (
-      (parent_type in ('game_rule_image', 'game_rule_document') and exists (
-        select 1 from public.game_rule_posts p
-        where p.id = parent_id and p.status = 'published'
-      ))
-      or (parent_type = 'sports_profile_photo' and exists (
-        select 1 from public.sports_profile_details s
-        where s.profile_photo_file_id = public.phase3_files.id and s.is_public
-      ))
+    and parent_type in ('game_rule_image', 'game_rule_document')
+    and exists (
+      select 1 from public.game_rule_posts p
+      where p.id = parent_id and p.status = 'published'
     )
   );
 
@@ -3095,6 +3127,7 @@ revoke all on function public.record_email_provider_event(text, text, text, json
 
 grant execute on function public.create_phase3_upload(text, uuid, text, text, bigint, text) to authenticated;
 grant execute on function public.confirm_phase3_upload(uuid, bigint, text) to authenticated;
+grant execute on function public.student_attach_phase3_file(text, uuid, uuid) to authenticated;
 grant execute on function public.authorize_phase3_download(uuid) to anon, authenticated;
 grant execute on function public.current_phase3_student_directory_id() to authenticated;
 grant execute on function public.current_phase3_matches_audience(jsonb) to authenticated;

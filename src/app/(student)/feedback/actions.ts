@@ -47,6 +47,23 @@ export async function submitFeedback(input: {
   };
 }
 
+export async function attachFeedbackAttachment(requestId: string, fileId: string): Promise<ActionState> {
+  await requireUser();
+  if (!z.string().uuid().safeParse(requestId).success || !z.string().uuid().safeParse(fileId).success) {
+    return { status: "error", message: "Choose a valid request and uploaded file." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("student_attach_phase3_file", {
+    p_parent_type: "feedback_attachment",
+    p_parent_id: requestId,
+    p_file_id: fileId,
+  });
+  if (error) return { status: "error", message: error.message || "The attachment could not be linked." };
+  revalidatePath("/feedback");
+  revalidatePath("/my-feedback");
+  return { status: "success", message: "Attachment linked to your request." };
+}
+
 export async function replyFeedback(input: {
   requestId: string;
   body: string;

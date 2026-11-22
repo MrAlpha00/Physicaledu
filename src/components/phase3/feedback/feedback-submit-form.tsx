@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { FeedbackCategory } from "@/types/database";
-import { submitFeedback } from "@/app/(student)/feedback/actions";
+import { attachFeedbackAttachment, submitFeedback } from "@/app/(student)/feedback/actions";
 import { FeedbackActionNotice } from "./action-notice";
 
 const CATEGORIES: FeedbackCategory[] = [
@@ -16,7 +16,10 @@ const CATEGORIES: FeedbackCategory[] = [
   "facility_issue", "sports_activity_request", "attendance_correction", "other",
 ];
 
-async function uploadAttachment(requestId: string, file: File): Promise<string | null> {
+async function uploadAttachment(
+  requestId: string,
+  file: File,
+): Promise<{ fileId: string | null; error: string | null }> {
   const auth = await authorizePhase3Upload({
     parentType: "feedback_attachment",
     parentId: requestId,
@@ -26,16 +29,16 @@ async function uploadAttachment(requestId: string, file: File): Promise<string |
     visibility: "private",
   });
   if (auth.status !== "success" || !auth.url || !auth.headers || !auth.fileId) {
-    return auth.message || "The attachment could not be authorised.";
+    return { fileId: null, error: auth.message || "The attachment could not be authorised." };
   }
   try {
     const response = await fetch(auth.url, { method: "PUT", headers: auth.headers, body: file });
-    if (!response.ok) return "Storage rejected the attachment. Please try again.";
+    if (!response.ok) return { fileId: null, error: "Storage rejected the attachment. Please try again." };
     const confirmed = await confirmPhase3Upload(auth.fileId);
-    if (confirmed.status !== "success") return confirmed.message;
-    return null;
+    if (confirmed.status !== "success") return { fileId: null, error: confirmed.message };
+    return { fileId: auth.fileId, error: null };
   } catch {
-    return "The attachment upload failed. Add it from your request page.";
+    return { fileId: null, error: "The attachment upload failed. Add it from your request page." };
   }
 }
 
@@ -63,13 +66,21 @@ export function FeedbackSubmitForm() {
       }
       setCreatedId(result.requestId);
       if (file) {
-        const uploadError = await uploadAttachment(result.requestId, file);
-        setNotice({
-          message: uploadError
-            ? `${result.message} The request was saved, but the attachment failed: ${uploadError} Add it from the request page.`
-            : `${result.message} Attachment uploaded.`,
-          error: Boolean(uploadError),
-        });
+        const upload = await uploadAttachment(result.requestId, file);
+        if (upload.error || !upload.fileId) {
+          setNotice({
+            message: `${result.message} The request was saved, but the attachment failed: ${upload.error ?? "Unknown error"} Add it from the request page.`,
+            error: true,
+          });
+        } else {
+          const linked = await attachFeedbackAttachment(result.requestId, upload.fileId);
+          setNotice({
+            message: linked.status === "success"
+              ? `${result.message} Attachment uploaded.`
+              : `${result.message} The attachment was uploaded but could not be linked: ${linked.message}`,
+            error: linked.status !== "success",
+          });
+        }
       } else {
         setNotice({ message: result.message, error: false });
       }
