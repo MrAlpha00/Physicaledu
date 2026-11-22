@@ -90,6 +90,7 @@ export interface Database {
         Row: {
           id: string;
           student_directory_id: string | null;
+          requested_usn: string;
           full_name: string;
           email: string;
           verification_status: VerificationStatus;
@@ -100,6 +101,7 @@ export interface Database {
         Insert: {
           id: string;
           student_directory_id?: string | null;
+          requested_usn: string;
           full_name: string;
           email: string;
           verification_status?: VerificationStatus;
