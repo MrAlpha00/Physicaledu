@@ -1,0 +1,11 @@
+-- Optional local seed data.
+--
+-- Intentionally empty: the college's department list and student directory are
+-- official data and must be entered by a PE administrator through the app.
+-- Do not add invented departments or student records to this file.
+--
+-- Example shape only (uncomment and replace with verified data for local dev):
+--
+-- insert into public.departments (department_code, department_name)
+-- values ('EXAMPLE', 'Example Department')
+-- on conflict (department_code) do nothing;
