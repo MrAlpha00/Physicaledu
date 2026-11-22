@@ -93,7 +93,7 @@ export function CalendarEventForm({
   const [category, setCategory] = useState<CalendarCategory>(initial?.category ?? "pe_class");
   const [startsAt, setStartsAt] = useState(initial?.startsAt ?? toIstLocalInput(new Date()));
   const [endsAt, setEndsAt] = useState(
-    initial?.endsAt ?? toIstLocalInput(new Date(Date.now() + 60 * 60 * 1000)),
+    initial?.endsAt ?? toIstLocalInput(new Date(new Date().getTime() + 60 * 60 * 1000)),
   );
   const [venue, setVenue] = useState(initial?.venue ?? "");
   const [visibility, setVisibility] = useState<CalendarVisibility>(initial?.visibility ?? "pe_only");

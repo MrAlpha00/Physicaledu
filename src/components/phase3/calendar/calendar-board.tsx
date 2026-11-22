@@ -33,7 +33,6 @@ function shiftMonth(month: string, delta: number): string {
 
 export function CalendarBoard({ occurrences }: { occurrences: CalendarOccurrenceItem[] }) {
   const today = istDateString();
-  const now = new Date();
   const [month, setMonth] = useState(today.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(today);
 
