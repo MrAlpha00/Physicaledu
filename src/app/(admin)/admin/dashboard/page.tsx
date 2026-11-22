@@ -1,0 +1,181 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  ArrowUpRight,
+  Building2,
+  ClipboardList,
+  GraduationCap,
+  IdCard,
+  Timer,
+  UserCheck,
+  UsersRound,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmptyState } from "@/components/shared/empty-state";
+import { VerificationBadge } from "@/components/shared/status-badge";
+import {
+  getAdminMetrics,
+  getDepartmentOptions,
+  getRecentRegistrations,
+} from "@/lib/data/admin";
+import { formatDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Admin dashboard" };
+
+const quickLinks = [
+  {
+    href: "/admin/students",
+    title: "Student management",
+    description: "Registered accounts, verification and the official directory.",
+    icon: UsersRound,
+  },
+  {
+    href: "/admin/pe-roster",
+    title: "PE Roster",
+    description: "Add, remove and reactivate PE classroom participants.",
+    icon: ClipboardList,
+  },
+  {
+    href: "/admin/departments",
+    title: "Departments",
+    description: "Configure the college department list used across the platform.",
+    icon: Building2,
+  },
+];
+
+export default async function AdminDashboardPage() {
+  const [metrics, recent, departments] = await Promise.all([
+    getAdminMetrics(),
+    getRecentRegistrations(),
+    getDepartmentOptions(),
+  ]);
+
+  const cards = [
+    { label: "Registered accounts", value: metrics.registeredAccounts, icon: UsersRound, accent: "bg-cobalt" },
+    { label: "Official directory", value: metrics.directoryRecords, icon: IdCard, accent: "bg-navy" },
+    { label: "Active PE students", value: metrics.peStudents, icon: GraduationCap, accent: "bg-[#8fb63c]" },
+    { label: "Pending verification", value: metrics.pendingVerifications, icon: Timer, accent: "bg-coral" },
+    { label: "Active departments", value: metrics.activeDepartments, icon: Building2, accent: "bg-navy" },
+  ];
+
+  return (
+    <div className="space-y-9">
+      <section className="flex flex-col gap-4 border-b-2 border-navy pb-6 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="eyebrow text-cobalt">PE administration / Overview</p>
+          <h1 className="mt-3 text-5xl font-bold leading-none sm:text-6xl">Department board</h1>
+          <p className="mt-3 text-sm text-ink-muted">
+            All figures below are live database counts. No placeholder data.
+          </p>
+        </div>
+        <Badge variant="lime" className="self-start">
+          <span className="size-1.5 rounded-full bg-[#5d8b1d]" /> Live records
+        </Badge>
+      </section>
+
+      <section aria-label="Key metrics">
+        <div className="grid gap-px border border-border bg-border sm:grid-cols-2 xl:grid-cols-5">
+          {cards.map(({ label, value, icon: Icon, accent }) => (
+            <div key={label} className="relative bg-card p-5">
+              <div className={`absolute inset-x-0 top-0 h-1 ${accent}`} />
+              <div className="flex items-start justify-between">
+                <span className="eyebrow text-ink-muted">{label}</span>
+                <Icon className="size-4 text-ink-muted" />
+              </div>
+              <p className="stat-number mt-4 text-5xl">{value}</p>
+              <p className="mt-2 text-[0.65rem] uppercase tracking-[0.12em] text-ink-muted">
+                Current total
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid gap-8 xl:grid-cols-[1.4fr_0.6fr]">
+        <section>
+          <div className="mb-4 flex items-center justify-between border-b-2 border-navy pb-3">
+            <h2 className="text-2xl font-bold">Recent registrations</h2>
+            <Link href="/admin/students" className="eyebrow text-cobalt hover:underline">
+              View all <ArrowUpRight className="inline size-3" />
+            </Link>
+          </div>
+          {recent.length === 0 ? (
+            <EmptyState
+              icon={UserCheck}
+              title="No student accounts yet"
+              description="When students register, their accounts and verification status will appear here."
+            />
+          ) : (
+            <div className="border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>USN</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Registered</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recent.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell>
+                        <p className="font-bold">{student.fullName}</p>
+                        <p className="text-xs text-ink-muted">{student.email}</p>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{student.usn}</TableCell>
+                      <TableCell>
+                        <VerificationBadge status={student.verificationStatus} />
+                      </TableCell>
+                      <TableCell className="text-xs text-ink-muted">
+                        {formatDate(student.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </section>
+
+        <section>
+          <div className="mb-4 flex items-center justify-between border-b-2 border-navy pb-3">
+            <h2 className="text-2xl font-bold">Quick access</h2>
+          </div>
+          <div className="space-y-3">
+            {quickLinks.map(({ href, title, description, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="group flex items-start gap-4 border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-cobalt/50 hover:shadow-md"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center bg-navy/5 text-navy group-hover:bg-cobalt group-hover:text-white">
+                  <Icon className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-heading text-xl font-semibold uppercase leading-none">{title}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-ink-muted">{description}</p>
+                </div>
+                <ArrowUpRight className="size-4 shrink-0 text-ink-muted group-hover:text-cobalt" />
+              </Link>
+            ))}
+          </div>
+
+          {departments.length === 0 ? (
+            <div className="mt-5 border-l-4 border-l-coral bg-coral/10 p-4">
+              <p className="text-sm font-bold text-[#8b3725]">Setup needed</p>
+              <p className="mt-1 text-xs leading-relaxed text-[#8b3725]/80">
+                No departments are configured yet. Students cannot register until at
+                least one department is active.
+              </p>
+              <Link href="/admin/departments" className="mt-3 inline-block text-xs font-bold text-cobalt underline">
+                Configure departments
+              </Link>
+            </div>
+          ) : null}
+        </section>
+      </div>
+    </div>
+  );
+}

@@ -101,6 +101,15 @@ export interface ImportResult {
   errors: ImportIssue[];
 }
 
+export interface ImportBatchSummary {
+  id: string;
+  fileName: string;
+  totalRows: number;
+  insertedRows: number;
+  skippedRows: number;
+  createdAt: string;
+}
+
 export interface AdminMetrics {
   registeredAccounts: number;
   directoryRecords: number;
