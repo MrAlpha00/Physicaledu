@@ -80,6 +80,27 @@ begin
 end;
 $$;
 
+-- Admin-only wrapper for deliberate actions (such as exports) that need an
+-- audit entry but do not otherwise mutate a Phase 2 table.
+create or replace function public.admin_log_action(
+  p_action text,
+  p_target_table text,
+  p_target_id text,
+  p_details jsonb default '{}'::jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_pe_admin() then
+    raise exception 'PE Admin access required';
+  end if;
+  perform public.write_audit(p_action, p_target_table, p_target_id, coalesce(p_details, '{}'::jsonb));
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Attendance
 -- ---------------------------------------------------------------------------
@@ -1733,6 +1754,7 @@ revoke all on function public.student_directory_id_for_user(uuid) from public;
 revoke all on function public.is_active_pe_student(uuid) from public;
 revoke all on function public.student_matches_task(uuid, uuid) from public;
 revoke all on function public.write_audit(text, text, text, jsonb) from public;
+revoke all on function public.admin_log_action(text, text, text, jsonb) from public;
 revoke all on function public.new_qr_token() from public;
 
 grant execute on function public.is_active_pe_student(uuid) to authenticated;
@@ -1756,6 +1778,7 @@ grant execute on function public.admin_correct_visitor_record(uuid, text) to aut
 grant execute on function public.admin_close_room_session(uuid, text) to authenticated;
 grant execute on function public.admin_set_qr_active(uuid, boolean) to authenticated;
 grant execute on function public.admin_regenerate_qr(uuid) to authenticated;
+grant execute on function public.admin_log_action(text, text, text, jsonb) to authenticated;
 
 -- Supabase Realtime: only authorised subscribers receive changes because the
 -- tables above have RLS policies for authenticated users.
