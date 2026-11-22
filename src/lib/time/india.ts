@@ -58,6 +58,12 @@ export function istDayEnd(dateString: string): Date {
   return new Date(`${addIstDays(dateString, 1)}T00:00:00+05:30`);
 }
 
+/** Convert a datetime-local input value into an IST timestamptz string. */
+export function istLocalInputToIso(value: string): string {
+  const normalized = value.length === 16 ? `${value}:00` : value;
+  return /([+-]\d{2}:\d{2}|Z)$/.test(normalized) ? new Date(normalized).toISOString() : `${normalized}+05:30`;
+}
+
 export function formatIstDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en-GB", {

@@ -2,7 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicSupabaseConfig } from "@/lib/env/public";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/profile", "/admin"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/profile",
+  "/admin",
+  "/classroom",
+  "/tasks",
+  "/scan",
+  "/room",
+];
 const GUEST_ONLY_PATHS = ["/login", "/register", "/forgot-password"];
 
 function hasPrefix(pathname: string, prefixes: string[]) {

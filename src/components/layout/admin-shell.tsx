@@ -4,12 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BookOpenCheck,
   ChevronDown,
   ClipboardList,
+  DoorOpen,
   GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu,
+  QrCode,
+  UserRoundCheck,
   UsersRound,
   X,
 } from "lucide-react";
@@ -28,6 +32,24 @@ const navigation = [
     ],
   },
   { href: "/admin/departments", label: "Departments", icon: GraduationCap },
+  {
+    label: "Classroom",
+    icon: BookOpenCheck,
+    children: [
+      { href: "/admin/classroom/attendance", label: "Attendance" },
+      { href: "/admin/classroom/tasks", label: "Tasks" },
+    ],
+  },
+  { href: "/admin/visitors", label: "Visitor Register", icon: UserRoundCheck },
+  {
+    label: "Room Monitoring",
+    icon: DoorOpen,
+    children: [
+      { href: "/admin/rooms", label: "Live occupancy" },
+      { href: "/admin/rooms/config", label: "Room configuration" },
+    ],
+  },
+  { href: "/admin/qr-codes", label: "QR Manager", icon: QrCode },
 ];
 
 export function AdminShell({

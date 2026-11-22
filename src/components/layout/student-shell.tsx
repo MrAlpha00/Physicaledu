@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, UserRound, UsersRound } from "lucide-react";
+import {
+  BookOpenCheck,
+  CalendarCheck,
+  LayoutDashboard,
+  LogOut,
+  QrCode,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import { Brand } from "@/components/layout/brand";
 import { signOutAction } from "@/app/auth/actions";
 import { VerificationBadge } from "@/components/shared/status-badge";
@@ -10,20 +18,29 @@ import { isPeAdminRole } from "@/lib/permissions/roles";
 import type { ProfileRow } from "@/types/domain";
 import { cn } from "@/lib/utils";
 
-const links = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/profile", label: "Profile", icon: UserRound },
-];
-
 export function StudentShell({
   profile,
+  isPeStudent,
   children,
 }: {
   profile: ProfileRow;
+  isPeStudent: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const isAdmin = isPeAdminRole(profile.roles);
+  const links = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    ...(isPeStudent
+      ? [
+          { href: "/classroom", label: "Classroom", icon: BookOpenCheck },
+          { href: "/classroom/attendance", label: "Attendance", icon: CalendarCheck },
+        ]
+      : []),
+    { href: "/tasks", label: "Tasks", icon: BookOpenCheck },
+    { href: "/scan", label: "Scan QR", icon: QrCode },
+    { href: "/profile", label: "Profile", icon: UserRound },
+  ];
 
   return (
     <div className="min-h-screen bg-chalk pb-20 lg:pb-0">
@@ -82,7 +99,7 @@ export function StudentShell({
       <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">{children}</main>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-navy/15 bg-card lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-navy/15 bg-card lg:hidden"
         aria-label="Mobile student navigation"
       >
         {links.map(({ href, label, icon: Icon }) => (
@@ -90,7 +107,7 @@ export function StudentShell({
             key={href}
             href={href}
             className={cn(
-              "flex flex-1 flex-col items-center gap-1 py-3 text-[0.65rem] font-bold uppercase tracking-[0.1em]",
+              "flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 px-2 py-3 text-[0.62rem] font-bold uppercase tracking-[0.08em]",
               pathname === href ? "text-cobalt" : "text-ink-muted",
             )}
           >
@@ -101,7 +118,7 @@ export function StudentShell({
         {isAdmin ? (
           <Link
             href="/admin/dashboard"
-            className="flex flex-1 flex-col items-center gap-1 py-3 text-[0.65rem] font-bold uppercase tracking-[0.1em] text-ink-muted"
+            className="flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 px-2 py-3 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-ink-muted"
           >
             <UsersRound className="size-5" />
             Admin
