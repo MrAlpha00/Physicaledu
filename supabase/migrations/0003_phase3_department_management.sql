@@ -2286,25 +2286,41 @@ language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare
   v_recipient_id uuid;
+  v_error text;
 begin
-  insert into public.email_delivery_events (recipient_id, provider_event_id, event_type, payload)
-  select id, p_provider_event_id, p_event_type, p_payload
-  from public.email_recipients where provider_message_id = p_provider_message_id
-  on conflict (provider_event_id) do nothing;
-
-  select id into v_recipient_id from public.email_recipients
-  where provider_message_id = p_provider_message_id;
-
-  if v_recipient_id is not null then
-    if p_event_type = 'delivered' then
-      update public.email_recipients
-      set status = 'delivered', delivered_at = now() where id = v_recipient_id
-        and status in ('accepted', 'delivered');
-    elsif p_event_type in ('bounced', 'complained') then
-      update public.email_recipients
-      set status = 'bounced', failed_at = now() where id = v_recipient_id;
-    end if;
+  if btrim(coalesce(p_provider_event_id, '')) = ''
+     or btrim(coalesce(p_provider_message_id, '')) = '' then
+    raise exception 'Provider event and message ids are required';
   end if;
+
+  -- RETURNING only yields a row on first receipt, so duplicates never reapply
+  -- a stale status or overwrite delivery timestamps.
+  insert into public.email_delivery_events (recipient_id, provider_event_id, event_type, payload)
+  select r.id, p_provider_event_id, p_event_type, p_payload
+  from public.email_recipients r
+  where r.provider_message_id = p_provider_message_id
+  on conflict (provider_event_id) do nothing
+  returning recipient_id into v_recipient_id;
+
+  if v_recipient_id is null then return; end if;
+  v_error := nullif(btrim(coalesce(p_payload->>'message', p_payload->>'reason', '')), '');
+
+  if p_event_type = 'delivered' then
+    update public.email_recipients
+    set status = 'delivered', delivered_at = now(), last_error = null
+    where id = v_recipient_id and status in ('accepted', 'delivered');
+  elsif p_event_type in ('bounced', 'complained') then
+    update public.email_recipients
+    set status = 'bounced', failed_at = now(),
+      last_error = left(coalesce(v_error, 'Provider reported a delivery failure'), 500)
+    where id = v_recipient_id;
+  elsif p_event_type = 'failed' then
+    update public.email_recipients
+    set status = 'failed', failed_at = now(),
+      last_error = left(coalesce(v_error, 'Provider reported a delivery failure'), 500)
+    where id = v_recipient_id;
+  end if;
+  -- 'accepted' is already recorded by the dispatcher and needs no update here.
 end;
 $$;
 
@@ -2316,8 +2332,17 @@ create or replace function public.student_save_sports_profile(p_data jsonb)
 returns setof public.sports_profile_details
 language plpgsql security definer set search_path = public, pg_temp
 as $$
+declare
+  v_photo_id uuid;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
+  v_photo_id := nullif(btrim(coalesce(p_data->>'profile_photo_file_id', '')), '')::uuid;
+  if v_photo_id is not null and not exists (
+    select 1 from public.phase3_files f
+    where f.id = v_photo_id and f.uploader_id = auth.uid()
+      and f.parent_type = 'sports_profile_photo' and f.parent_id = auth.uid()
+      and f.upload_status = 'confirmed'
+  ) then raise exception 'Profile photo must be your own uploaded image'; end if;
 
   insert into public.sports_profile_details (
     user_id, biography, sports_interests, preferred_sports, profile_photo_file_id, is_public
@@ -2328,7 +2353,7 @@ begin
       else array(select jsonb_array_elements_text(p_data->'sports_interests')) end,
     case when p_data->'preferred_sports' is null then array[]::text[]
       else array(select jsonb_array_elements_text(p_data->'preferred_sports')) end,
-    nullif(p_data->>'profile_photo_file_id', '')::uuid,
+    v_photo_id,
     coalesce((p_data->>'is_public')::boolean, false)
   )
   on conflict (user_id) do update set
@@ -2337,7 +2362,7 @@ begin
       else array(select jsonb_array_elements_text(p_data->'sports_interests')) end,
     preferred_sports = case when p_data->'preferred_sports' is null then array[]::text[]
       else array(select jsonb_array_elements_text(p_data->'preferred_sports')) end,
-    profile_photo_file_id = nullif(p_data->>'profile_photo_file_id', '')::uuid,
+    profile_photo_file_id = v_photo_id,
     is_public = coalesce((p_data->>'is_public')::boolean, false)
   where sports_profile_details.user_id = auth.uid();
 
@@ -2727,11 +2752,8 @@ begin
       select 1 from public.game_rule_posts p
       where p.id = v_file.parent_id and p.status = 'published'
     ) into v_allowed;
-  elsif v_file.parent_type = 'sports_profile_photo' then
-    select exists (
-      select 1 from public.sports_profile_details s
-      where s.profile_photo_file_id = v_file.id and s.is_public
-    ) into v_allowed;
+  -- Profile photos are private: only the uploader (handled above) or an admin
+  -- may download them. Public profile pages never expose the image file.
   elsif v_user is not null then
     v_directory := public.phase3_student_directory_id(v_user);
     if v_file.parent_type = 'feedback_attachment' then

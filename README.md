@@ -5,7 +5,10 @@ Education department. Phase 1 establishes the foundation: student accounts, an
 official student directory, configurable departments, PE roster membership,
 role-based access and two distinct dashboards. Phase 2 adds the daily PE
 operations: attendance, class tasks, the digital visitor register, room
-entry/exit with live occupancy, QR posters and R2-backed file storage.
+entry/exit with live occupancy, QR posters and R2-backed file storage. Phase 3
+adds department management: equipment loans and maintenance, a bounded activity
+calendar, student feedback, a published-only game rules CMS, in-app
+notifications, optional Resend email, sports profiles and real reports/exports.
 
 The design direction is **VARSITY — Athletic Digital Experience**: collegiate
 athletics typography, a navy/chalk/lime palette and scoreboard-inspired data —
@@ -21,11 +24,15 @@ with real records only.
 | Backend | Supabase PostgreSQL, Supabase Auth, Row Level Security |
 | Auth integration | `@supabase/ssr` (cookies + proxy session refresh) |
 | Files & QR | Cloudflare R2, ExcelJS, JSZip, `qrcode`, `sharp`, `@zxing/browser` |
+| Charts & webhooks | Recharts (reports), Svix (Resend webhook signature verification) |
 | Forms & abuse control | Cloudflare Turnstile (optional), honeypot + rate limiting |
 | Hosting | Vercel-compatible |
 | Testing | Vitest (pure logic), TypeScript, ESLint, production build |
 
-Resend/email broadcast is reserved for a later phase and is not used.
+Resend email is used in Phase 3 as an optional, server-only, DB-backed queue of
+individual announcement messages. Without an API key, in-app notifications still
+work and admins see a warning. Delivery is confirmed by signed webhook; accepted
+by the provider is tracked separately.
 
 ## Setup
 
