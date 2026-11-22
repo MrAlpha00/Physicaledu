@@ -83,6 +83,73 @@ export async function createManualStudent(input: ManualStudentInput): Promise<Ac
   return { status: "success", message: "Official student record added." };
 }
 
+export async function updateStudentDirectory(
+  input: ManualStudentInput & { id: string },
+): Promise<ActionState> {
+  await requirePeAdmin();
+
+  const parsed = manualStudentSchema.safeParse(input);
+  if (!parsed.success || !input.id) {
+    return { status: "error", message: "Check the student details and try again." };
+  }
+
+  const usn = normalizeUsn(parsed.data.usn);
+  const supabase = await createClient();
+
+  const [{ data: department }, { data: duplicate }] = await Promise.all([
+    supabase
+      .from("departments")
+      .select("id")
+      .eq("id", parsed.data.departmentId)
+      .eq("is_active", true)
+      .maybeSingle(),
+    supabase.from("student_directory").select("id").eq("usn", usn).maybeSingle(),
+  ]);
+
+  if (!department) {
+    return { status: "error", message: "Select an active department." };
+  }
+  if (duplicate && duplicate.id !== input.id) {
+    return { status: "error", message: "Another directory record already uses this USN." };
+  }
+
+  // A linked account's USN cannot be silently changed: requested_usn on the
+  // profile is immutable, so reject that correction explicitly.
+  const { data: linkedProfile } = await supabase
+    .from("profiles")
+    .select("requested_usn")
+    .eq("student_directory_id", input.id)
+    .maybeSingle();
+
+  if (linkedProfile && linkedProfile.requested_usn !== usn) {
+    return {
+      status: "error",
+      message: "This student has an account. The USN cannot be changed without contacting support.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("student_directory")
+    .update({
+      usn,
+      full_name: parsed.data.fullName,
+      department_id: department.id,
+      academic_year: parsed.data.academicYear,
+      semester: parsed.data.semester,
+      official_email: parsed.data.officialEmail?.trim().toLowerCase() || null,
+    })
+    .eq("id", input.id);
+
+  if (error) {
+    return { status: "error", message: "Student record could not be corrected." };
+  }
+
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/pe-roster");
+  revalidatePath("/dashboard");
+  return { status: "success", message: "Official student record corrected." };
+}
+
 export async function importStudentDirectory(
   rows: ImportRowInput[],
   fileName: string,

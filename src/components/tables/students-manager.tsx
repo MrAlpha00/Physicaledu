@@ -39,6 +39,17 @@ export function StudentsManager({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("accounts");
   const [manualOpen, setManualOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<DirectoryRow | null>(null);
+
+  function openCreate() {
+    setEditingRecord(null);
+    setManualOpen(true);
+  }
+
+  function openCorrection(record: DirectoryRow) {
+    setEditingRecord(record);
+    setManualOpen(true);
+  }
 
   const tabs: Array<{ id: Tab; label: string; count: number }> = [
     { id: "accounts", label: "Registered accounts", count: accounts.length },
@@ -67,25 +78,32 @@ export function StudentsManager({
             </button>
           ))}
         </div>
-        <Button onClick={() => setManualOpen(true)} className="self-start">
+        <Button onClick={openCreate} className="self-start">
           <UserPlus /> Add student record
         </Button>
       </div>
 
       {tab === "accounts" ? <StudentAccountsTable students={accounts} /> : null}
-      {tab === "directory" ? <DirectoryTable records={directory} departments={departments} /> : null}
+      {tab === "directory" ? (
+        <DirectoryTable records={directory} departments={departments} onEdit={openCorrection} />
+      ) : null}
       {tab === "import" ? <DirectoryImportPanel history={importHistory} /> : null}
 
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add official student record</DialogTitle>
+            <DialogTitle>
+              {editingRecord ? "Correct official student record" : "Add official student record"}
+            </DialogTitle>
             <DialogDescription>
-              Creates a directory record only. The student can link their own account
-              later during registration.
+              {editingRecord
+                ? "Review every field carefully. Confirming writes the corrected details to the official directory and records an audit entry. Linked account USNs cannot be changed here."
+                : "Creates a directory record only. The student can link their own account later during registration."}
             </DialogDescription>
           </DialogHeader>
           <ManualStudentForm
+            key={editingRecord?.id ?? "new"}
+            record={editingRecord ?? undefined}
             departments={departments.filter((department) => department.isActive)}
             onDone={() => {
               setManualOpen(false);

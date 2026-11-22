@@ -249,6 +249,44 @@ create trigger profiles_set_updated_at
   before update on public.profiles
   for each row execute function public.set_updated_at();
 
+-- Defence in depth: even if a future policy is too broad, privileged profile
+-- fields can never be changed by a normal student, and an admin cannot verify
+-- their own account.
+create or replace function public.enforce_profile_privileged_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if not public.is_pe_admin(auth.uid()) then
+    if new.verification_status is distinct from old.verification_status
+      or new.account_status is distinct from old.account_status
+      or new.student_directory_id is distinct from old.student_directory_id
+      or new.requested_usn is distinct from old.requested_usn
+      or new.email is distinct from old.email
+    then
+      raise exception 'Privileged profile fields cannot be changed by the account owner'
+        using errcode = '42501';
+    end if;
+  elsif new.id = auth.uid()
+    and new.verification_status is distinct from old.verification_status
+  then
+    raise exception 'You cannot verify your own account' using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger profiles_protect_privileged_fields
+  before update on public.profiles
+  for each row execute function public.enforce_profile_privileged_fields();
+
 create trigger pe_memberships_set_updated_at
   before update on public.pe_memberships
   for each row execute function public.set_updated_at();
@@ -587,9 +625,16 @@ create policy "profiles_read_self_or_admin"
   on public.profiles for select to authenticated
   using (id = auth.uid() or public.is_pe_admin());
 
--- No INSERT / UPDATE / DELETE policy exists for profiles. Accounts are created
--- by the trusted registration service, and field changes go through
--- update_my_profile() or an authorised admin using a privileged path.
+-- Students have no direct UPDATE policy: they can only change their display
+-- name through update_my_profile(). Verified PE admins may update accounts for
+-- administrative purposes; all such changes are captured by the audit trigger.
+create policy "profiles_admin_update"
+  on public.profiles for update to authenticated
+  using (public.is_pe_admin())
+  with check (public.is_pe_admin());
+
+-- No INSERT / DELETE policy exists for profiles. Accounts are created by the
+-- trusted registration service and are never deleted through the app.
 
 create policy "roles_read_self_or_admin"
   on public.user_roles for select to authenticated
@@ -660,3 +705,4 @@ revoke all on function public.set_updated_at() from public;
 revoke all on function public.normalize_department_code() from public;
 revoke all on function public.normalize_student_usn() from public;
 revoke all on function public.audit_row_change() from public;
+revoke all on function public.enforce_profile_privileged_fields() from public;

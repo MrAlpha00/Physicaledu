@@ -14,19 +14,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createManualStudent } from "@/app/(admin)/admin/students/actions";
+import {
+  createManualStudent,
+  updateStudentDirectory,
+} from "@/app/(admin)/admin/students/actions";
 import {
   manualStudentSchema,
   type ManualStudentInput,
 } from "@/lib/validations/admin";
-import type { ActionState, DepartmentOption } from "@/types/domain";
+import type { ActionState, DepartmentOption, DirectoryRow } from "@/types/domain";
 
 export function ManualStudentForm({
   departments,
   onDone,
+  record,
 }: {
   departments: DepartmentOption[];
   onDone: () => void;
+  record?: DirectoryRow;
 }) {
   const [notice, setNotice] = useState<ActionState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,19 +43,21 @@ export function ManualStudentForm({
   } = useForm<ManualStudentInput>({
     resolver: zodResolver(manualStudentSchema),
     defaultValues: {
-      usn: "",
-      fullName: "",
-      departmentId: "",
-      academicYear: 1,
-      semester: 1,
-      officialEmail: "",
+      usn: record?.usn ?? "",
+      fullName: record?.fullName ?? "",
+      departmentId: record?.departmentId ?? "",
+      academicYear: record?.academicYear ?? 1,
+      semester: record?.semester ?? 1,
+      officialEmail: record?.officialEmail ?? "",
     },
   });
 
   async function onSubmit(values: ManualStudentInput) {
     setBusy(true);
     setNotice(null);
-    const result = await createManualStudent(values);
+    const result = record
+      ? await updateStudentDirectory({ ...values, id: record.id })
+      : await createManualStudent(values);
     setBusy(false);
     setNotice(result);
     if (result.status === "success") onDone();
@@ -146,7 +153,7 @@ export function ManualStudentForm({
       </div>
       <Button type="submit" disabled={busy} className="w-full">
         {busy ? <LoaderCircle className="animate-spin" /> : null}
-        {busy ? "Adding record…" : "Add official record"}
+        {busy ? "Saving…" : record ? "Confirm correction" : "Add official record"}
       </Button>
     </form>
   );

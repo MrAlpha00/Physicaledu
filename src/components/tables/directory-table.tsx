@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, UsersRound } from "lucide-react";
+import { Pencil, Search, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -19,9 +20,11 @@ import type { DirectoryRow } from "@/types/domain";
 export function DirectoryTable({
   records,
   departments,
+  onEdit,
 }: {
   records: DirectoryRow[];
   departments: { id: string; code: string; name: string }[];
+  onEdit: (record: DirectoryRow) => void;
 }) {
   const [query, setQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -101,6 +104,7 @@ export function DirectoryTable({
                 <TableHead>Year / Sem</TableHead>
                 <TableHead>Account</TableHead>
                 <TableHead>Source</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -125,6 +129,16 @@ export function DirectoryTable({
                     )}
                   </TableCell>
                   <TableCell className="text-xs capitalize text-ink-muted">{record.source}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onEdit(record)}
+                      aria-label={`Correct ${record.fullName}`}
+                    >
+                      <Pencil /> Correct
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
