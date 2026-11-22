@@ -84,6 +84,7 @@ export default async function RoomScanPage({
       <div className="mt-8">
         <RoomScanPanel
           token={token}
+          roomId={room.id}
           roomName={room.name}
           requiresActivity={Boolean(qr.requires_activity)}
           activities={(activitiesResult.data ?? []).map((activity) => ({
@@ -91,6 +92,7 @@ export default async function RoomScanPage({
             name: activity.name,
           }))}
           activeSessionId={activeResult.data?.id ?? null}
+          activeSessionRoomId={activeResult.data?.room_id ?? null}
           isAuthenticated={Boolean(user)}
         />
       </div>
