@@ -19,6 +19,10 @@ interface Option {
   label: string;
 }
 
+// Stable module-level defaults keep the component render pure.
+const DEFAULT_STARTS_AT = toIstLocalInput(new Date());
+const DEFAULT_DUE_AT = toIstLocalInput(new Date(Date.now() + 7 * 86_400_000));
+
 const AUDIENCE_OPTIONS: Array<{ value: AudienceType; label: string }> = [
   { value: "all_students", label: "All registered students" },
   { value: "active_pe", label: "Active PE students" },
@@ -45,8 +49,8 @@ export function TaskForm({
     title: task?.title ?? "",
     description: task?.description ?? "",
     category: task?.category ?? "general",
-    startsAt: task ? toIstLocalInput(task.startsAt) : toIstLocalInput(new Date()),
-    dueAt: task ? toIstLocalInput(task.dueAt) : toIstLocalInput(new Date(Date.now() + 7 * 86_400_000)),
+    startsAt: task ? toIstLocalInput(task.startsAt) : DEFAULT_STARTS_AT,
+    dueAt: task ? toIstLocalInput(task.dueAt) : DEFAULT_DUE_AT,
     priority: task?.priority ?? "normal",
     instructions: task?.instructions ?? "",
     submissionRequirements: task?.submissionRequirements ?? "",

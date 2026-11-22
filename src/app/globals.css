@@ -125,3 +125,41 @@
     linear-gradient(to bottom, color-mix(in srgb, #f4f2e9 8%, transparent) 1px, transparent 1px);
   background-size: 44px 44px;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #101d2c !important;
+  }
+
+  [data-no-print],
+  .no-print {
+    display: none !important;
+  }
+
+  .print-page {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .print-poster {
+    display: block;
+    width: 100%;
+    max-width: 180mm;
+    height: auto;
+    margin: 0 auto;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

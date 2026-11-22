@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/app/auth/actions";
 import { requireUser } from "@/lib/auth/session";
 import { getMyPeMembershipStatus, getStudentProfile } from "@/lib/data/student";
+import { getMyAttendance } from "@/lib/data/attendance";
+import { getMyTasks } from "@/lib/data/tasks";
 import { formatDate, initials } from "@/lib/utils";
 import { VerificationBadge } from "@/components/shared/status-badge";
 
@@ -17,6 +19,9 @@ export default async function StudentDashboardPage() {
     getStudentProfile(user),
     getMyPeMembershipStatus(user),
   ]);
+  const [attendance, tasks] = membership.enrolled
+    ? await Promise.all([getMyAttendance(user), getMyTasks(user)])
+    : [null, []];
 
   const metrics = [
     {
@@ -91,6 +96,50 @@ export default async function StudentDashboardPage() {
           ))}
         </div>
       </section>
+
+      {membership.enrolled && attendance ? (
+        <section aria-label="PE classroom summary">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b-2 border-navy pb-3">
+            <div>
+              <p className="eyebrow text-cobalt">PE classroom</p>
+              <h2 className="mt-2 text-2xl font-bold">Your PE activity</h2>
+            </div>
+            <p className="text-xs text-ink-muted">
+              {attendance.session ? `Current session: ${attendance.session.title}` : "No open PE session"}
+            </p>
+          </div>
+          <div className="grid gap-px border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
+            <div className="bg-card p-5">
+              <span className="eyebrow text-ink-muted">Attendance</span>
+              <p className="stat-number mt-3 text-4xl">{attendance.percentage}%</p>
+              <p className="mt-2 text-xs text-ink-muted">
+                {attendance.present} present · {attendance.absent} absent
+              </p>
+            </div>
+            <div className="bg-card p-5">
+              <span className="eyebrow text-ink-muted">Current status</span>
+              <p className="mt-3 font-heading text-3xl font-bold uppercase">
+                {attendance.status?.replace(/_/g, " ") ?? "No record"}
+              </p>
+              <p className="mt-2 text-xs text-ink-muted">Asia/Kolkata class day</p>
+            </div>
+            <div className="bg-card p-5">
+              <span className="eyebrow text-ink-muted">Tasks assigned</span>
+              <p className="stat-number mt-3 text-4xl">{tasks.length}</p>
+              <p className="mt-2 text-xs text-ink-muted">
+                {tasks.filter((task) => task.submission === null).length} awaiting a response
+              </p>
+            </div>
+            <div className="bg-card p-5">
+              <span className="eyebrow text-ink-muted">QR tools</span>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link href="/scan" className="text-xs font-bold text-cobalt hover:underline">Scan a PE QR →</Link>
+                <Link href="/classroom/attendance" className="text-xs font-bold text-cobalt hover:underline">Attendance →</Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr]">
         {/* PE MEMBERSHIP */}

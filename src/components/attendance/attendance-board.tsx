@@ -93,7 +93,6 @@ export function AttendanceBoard({
     });
   }, [department, records, search]);
 
-  useEffect(() => setPage(0), [department, search]);
   const groups = useMemo(() => splitAttendanceRows(filtered), [filtered]);
   const visibleSubmitted = groups.submitted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const visibleNotSubmitted = groups.notSubmitted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -247,7 +246,10 @@ export function AttendanceBoard({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setDepartment("all")}
+              onClick={() => {
+                setDepartment("all");
+                setPage(0);
+              }}
               className={cn(
                 "border px-3 py-2 text-[0.65rem] font-extrabold uppercase tracking-[0.12em]",
                 department === "all" ? "border-navy bg-navy text-lime" : "border-border bg-card text-ink-muted",
@@ -259,7 +261,10 @@ export function AttendanceBoard({
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setDepartment(item.id)}
+                onClick={() => {
+                  setDepartment(item.id);
+                  setPage(0);
+                }}
                 className={cn(
                   "border px-3 py-2 text-[0.65rem] font-extrabold uppercase tracking-[0.12em]",
                   department === item.id
@@ -278,7 +283,10 @@ export function AttendanceBoard({
               className="pl-9"
               placeholder="Search name or USN"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(0);
+              }}
             />
           </div>
         </div>

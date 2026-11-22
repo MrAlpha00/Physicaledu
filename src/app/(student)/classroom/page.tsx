@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BookOpenCheck, CircleSlash2 } from "lucide-react";
+import { CircleSlash2 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAttendance } from "@/lib/data/attendance";
 import { getMyPeMembershipStatus } from "@/lib/data/student";

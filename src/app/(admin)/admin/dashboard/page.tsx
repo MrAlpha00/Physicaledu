@@ -3,11 +3,15 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   Building2,
+  ClipboardCheck,
   ClipboardList,
+  DoorOpen,
   GraduationCap,
   IdCard,
+  QrCode,
   Timer,
   UserCheck,
+  UserRoundCheck,
   UsersRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +23,7 @@ import {
   getDepartmentOptions,
   getRecentRegistrations,
 } from "@/lib/data/admin";
+import { getPhase2AdminMetrics } from "@/lib/data/phase2-dashboard";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin dashboard" };
@@ -42,13 +47,38 @@ const quickLinks = [
     description: "Configure the college department list used across the platform.",
     icon: Building2,
   },
+  {
+    href: "/admin/classroom/attendance",
+    title: "PE attendance",
+    description: "Run live classroom attendance sessions and review submissions.",
+    icon: ClipboardCheck,
+  },
+  {
+    href: "/admin/visitors",
+    title: "Visitor register",
+    description: "Full PE Block visitor records and genuine .xlsx exports.",
+    icon: UserRoundCheck,
+  },
+  {
+    href: "/admin/rooms",
+    title: "Room management",
+    description: "Live occupancy, forced closures and activity history.",
+    icon: DoorOpen,
+  },
+  {
+    href: "/admin/qr-codes",
+    title: "QR management",
+    description: "Download, print and rotate all official PE QR posters.",
+    icon: QrCode,
+  },
 ];
 
 export default async function AdminDashboardPage() {
-  const [metrics, recent, departments] = await Promise.all([
+  const [metrics, recent, departments, phase2] = await Promise.all([
     getAdminMetrics(),
     getRecentRegistrations(),
     getDepartmentOptions(),
+    getPhase2AdminMetrics(),
   ]);
 
   const cards = [
@@ -87,6 +117,45 @@ export default async function AdminDashboardPage() {
               <p className="mt-2 text-[0.65rem] uppercase tracking-[0.12em] text-ink-muted">
                 Current total
               </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section aria-label="Daily PE operations">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b-2 border-navy pb-3">
+          <div>
+            <p className="eyebrow text-cobalt">Phase 2 · Daily operations</p>
+            <h2 className="mt-2 text-2xl font-bold">Today on campus</h2>
+          </div>
+          <p className="text-xs text-ink-muted">
+            {phase2.openSessionTitle ? `Open session: ${phase2.openSessionTitle}` : "No open attendance session"}
+          </p>
+        </div>
+        <div className="grid gap-px border border-border bg-border sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            { label: "Present now", value: phase2.presentCount, href: "/admin/classroom/attendance" },
+            { label: "Pending approvals", value: phase2.pendingApprovals, href: "/admin/classroom/attendance" },
+            { label: "Not submitted", value: phase2.notSubmittedCount, href: "/admin/classroom/attendance" },
+            { label: "Today's visitors", value: phase2.todayVisitors, href: "/admin/visitors" },
+            { label: "Submissions to review", value: phase2.pendingTaskSubmissions, href: "/admin/classroom/tasks" },
+          ].map((item) => (
+            <Link key={item.label} href={item.href} className="bg-card p-5 transition-colors hover:bg-lime/20">
+              <span className="eyebrow text-ink-muted">{item.label}</span>
+              <p className="stat-number mt-3 text-4xl">{item.value}</p>
+              <p className="mt-2 text-[0.65rem] uppercase tracking-[0.12em] text-cobalt">Open board →</p>
+            </Link>
+          ))}
+        </div>
+        <div className="mt-px grid gap-px border border-border bg-border sm:grid-cols-3">
+          {[
+            { label: "Playing room occupancy", value: phase2.playingOccupancy },
+            { label: "Gym occupancy", value: phase2.gymOccupancy },
+            { label: "Mental games occupancy", value: phase2.mentalOccupancy },
+          ].map((item) => (
+            <div key={item.label} className="bg-card p-5">
+              <span className="eyebrow text-ink-muted">{item.label}</span>
+              <p className="stat-number mt-3 text-4xl">{item.value}</p>
             </div>
           ))}
         </div>
