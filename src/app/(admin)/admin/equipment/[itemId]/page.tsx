@@ -42,6 +42,7 @@ export default async function AdminEquipmentItemDetailPage({
 
   return (
     <div className="space-y-8">
+      <div data-no-print className="space-y-8">
       <Phase3Header
         kicker="Equipment / Item record"
         title={item.name}
@@ -142,6 +143,7 @@ export default async function AdminEquipmentItemDetailPage({
       </section>
 
       <QrForm item={item} assets={assets} />
+      </div>
 
       <ItemLabel item={item} assets={assets} loanCount={openLoans} />
     </div>

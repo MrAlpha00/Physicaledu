@@ -12,13 +12,15 @@ export default async function AdminEquipmentItemsPage() {
     getEquipmentItems(),
     getEquipmentAssets(),
     createClient().then((supabase) =>
-      supabase.from("equipment_items").select("id, image_file_id"),
+      supabase.from("equipment_items").select("id, image_file_id, notes"),
     ),
   ]);
 
   const imageFileIds: Record<string, string> = {};
+  const notesByItem: Record<string, string> = {};
   (imageResult.data ?? []).forEach((row) => {
     imageFileIds[row.id] = row.image_file_id ?? "";
+    notesByItem[row.id] = row.notes ?? "";
   });
 
   return (
@@ -33,6 +35,7 @@ export default async function AdminEquipmentItemsPage() {
         categories={categories}
         assets={assets}
         imageFileIds={imageFileIds}
+        notesByItem={notesByItem}
       />
     </div>
   );

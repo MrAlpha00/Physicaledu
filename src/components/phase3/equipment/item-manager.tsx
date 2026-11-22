@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Phase3StatusBadge } from "@/components/phase3/common";
 import { Button } from "@/components/ui/button";
@@ -14,11 +15,13 @@ export function ItemManager({
   categories,
   assets,
   imageFileIds,
+  notesByItem,
 }: {
   items: EquipmentItemView[];
   categories: EquipmentCategoryView[];
   assets: EquipmentAssetView[];
   imageFileIds: Record<string, string>;
+  notesByItem: Record<string, string>;
 }) {
   const [selectedId, setSelectedId] = useState(items[0]?.id ?? "");
   const selected = items.find((item) => item.id === selectedId);
@@ -68,9 +71,9 @@ export function ItemManager({
           <p className="eyebrow text-cobalt">{selected ? "Edit equipment" : "New equipment"}</p>
           <h2 className="mt-2 text-2xl font-bold">{selected ? selected.name : "Register an item"}</h2>
           {selected ? (
-            <a href={`/admin/equipment/${selected.id}`} className="mt-1 inline-block text-xs font-bold text-cobalt hover:underline">
+            <Link href={`/admin/equipment/${selected.id}`} className="mt-1 inline-block text-xs font-bold text-cobalt hover:underline">
               Open detail and QR tools →
-            </a>
+            </Link>
           ) : null}
         </div>
         <div className="mt-5">
@@ -79,6 +82,7 @@ export function ItemManager({
             categories={categories}
             item={selected}
             imageFileId={selected ? imageFileIds[selected.id] ?? "" : ""}
+            initialNotes={selected ? notesByItem[selected.id] ?? "" : ""}
           />
         </div>
         {selected?.trackingMode === "individual" ? (

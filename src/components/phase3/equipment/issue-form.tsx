@@ -101,6 +101,7 @@ export function IssueForm({
             onChange={(event) => {
               setItemId(event.target.value);
               setAssetId("");
+              setQuantity(1);
             }}
           >
             <option value="">Choose equipment</option>

@@ -23,7 +23,12 @@ export default async function EquipmentQrPage({
 }) {
   await requireUser();
   const { token } = await params;
-  const qr = await resolveEquipmentQrToken(token);
+  let qr = null;
+  try {
+    qr = await resolveEquipmentQrToken(token);
+  } catch {
+    qr = null;
+  }
 
   if (!qr) {
     return (
@@ -131,6 +136,7 @@ export default async function EquipmentQrPage({
                     assets={linkedAsset ? [linkedAsset] : []}
                     defaultReturnAt={defaultReturnAt}
                     lockedAssetId={qr.assetId}
+                    lockedAssetLabel={qr.assetTag ?? ""}
                   />
                 ) : (
                   <Phase3Notice tone="warning">

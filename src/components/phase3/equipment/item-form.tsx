@@ -16,10 +16,12 @@ export function ItemForm({
   categories,
   item,
   imageFileId = "",
+  initialNotes = "",
 }: {
   categories: EquipmentCategoryView[];
   item?: EquipmentItemView;
   imageFileId?: string;
+  initialNotes?: string;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -35,7 +37,7 @@ export function ItemForm({
   const [purchasedOn, setPurchasedOn] = useState(item?.purchasedOn ?? "");
   const [usefulLifeMonths, setUsefulLifeMonths] = useState<number | "">(item?.usefulLifeMonths ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
-  const [notes, setNotes] = useState(item?.notes ?? "");
+  const [notes, setNotes] = useState(initialNotes);
   const [isActive, setIsActive] = useState(item?.isActive ?? true);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {

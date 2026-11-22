@@ -6,8 +6,8 @@ import { borrowEquipmentAsStudent } from "@/app/(student)/equipment/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { EquipmentAssetView, EquipmentTrackingMode } from "@/types/database";
-import type { ActionState } from "@/types/domain";
+import type { EquipmentTrackingMode } from "@/types/database";
+import type { ActionState, EquipmentAssetView } from "@/types/domain";
 import { EquipmentActionNotice } from "./equipment-action-notice";
 import { Field, FormSelect } from "./form-controls";
 
@@ -19,6 +19,7 @@ export function BorrowForm({
   assets,
   defaultReturnAt,
   lockedAssetId = "",
+  lockedAssetLabel = "",
 }: {
   itemId: string;
   itemName: string;
@@ -27,6 +28,7 @@ export function BorrowForm({
   assets: EquipmentAssetView[];
   defaultReturnAt: string;
   lockedAssetId?: string;
+  lockedAssetLabel?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -67,7 +69,7 @@ export function BorrowForm({
               <Input
                 id={`borrow-asset-${itemId}`}
                 className="mt-2 uppercase"
-                value={lockedAssetId || assets[0]?.assetTag || ""}
+                value={lockedAssetLabel || assets[0]?.assetTag || lockedAssetId}
                 readOnly
               />
             </Field>
