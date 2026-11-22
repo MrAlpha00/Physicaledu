@@ -638,7 +638,7 @@ export interface Database {
         Returns: Json;
       };
       is_active_pe_student: { Args: { p_user_id?: string }; Returns: boolean };
-      write_audit: {
+      admin_log_action: {
         Args: {
           p_action: string;
           p_target_table: string;

@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
   sheet.getColumn(8).width = 46;
   sheet.autoFilter = { from: { row: 5, column: 1 }, to: { row: 5 + rows.length, column: 8 } };
 
-  await supabase.rpc("write_audit", {
+  await supabase.rpc("admin_log_action", {
     p_action: "visitor_export_xlsx",
     p_target_table: "visitor_records",
     p_target_id: preset,
