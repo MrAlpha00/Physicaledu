@@ -8,7 +8,7 @@ import { AlertCircle, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login, type } from "@/app/(public)/login/actions";
+import { login } from "@/app/(public)/login/actions";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import type { ActionState } from "@/types/domain";
 
