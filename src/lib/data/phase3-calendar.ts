@@ -89,7 +89,7 @@ async function loadOccurrences(from: Date, to: Date): Promise<CalendarOccurrence
   ]);
 
   const rulesByEvent = new Map((rulesResult.data ?? []).map((row) => [row.event_id, row]));
-  const overridesByRule = new Map<string, typeof overridesResult.data>();
+  const overridesByRule = new Map<string, Phase3CalendarOverrideRow[]>();
   (overridesResult.data ?? []).forEach((row) => {
     const list = overridesByRule.get(row.rule_id) ?? [];
     list.push(row);
