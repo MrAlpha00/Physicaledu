@@ -2590,8 +2590,19 @@ create policy calendar_audiences_admin_all on public.calendar_audiences for all 
   using (public.is_pe_admin()) with check (public.is_pe_admin());
 create policy calendar_recurrence_rules_admin_all on public.calendar_recurrence_rules for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
+create policy calendar_recurrence_rules_visible_read on public.calendar_recurrence_rules for select to anon, authenticated
+  using (exists (
+    select 1 from public.pe_calendar_events e
+    where e.id = event_id and public.can_view_calendar_event(e.id, nullif(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid))
+  ));
 create policy calendar_event_overrides_admin_all on public.calendar_event_overrides for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
+create policy calendar_event_overrides_visible_read on public.calendar_event_overrides for select to anon, authenticated
+  using (exists (
+    select 1 from public.calendar_recurrence_rules r
+    join public.pe_calendar_events e on e.id = r.event_id
+    where r.id = rule_id and public.can_view_calendar_event(e.id, nullif(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid))
+  ));
 
 create policy feedback_requests_admin_all on public.feedback_requests for all to authenticated
   using (public.is_pe_admin()) with check (public.is_pe_admin());
@@ -2718,8 +2729,8 @@ grant select on public.notifications, public.notification_preferences,
   public.email_daily_usage to authenticated;
 
 grant select on public.game_rule_categories, public.game_rule_posts, public.game_rule_blocks,
-  public.pe_calendar_events, public.phase3_files, public.sports_profile_details,
-  public.sports_achievements to anon;
+  public.pe_calendar_events, public.calendar_recurrence_rules, public.calendar_event_overrides,
+  public.phase3_files, public.sports_profile_details, public.sports_achievements to anon;
 
 -- Function grants. Internal helpers stay ungranted; the webhook function is
 -- intentionally service-role-only.
