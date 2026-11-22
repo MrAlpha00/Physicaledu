@@ -82,3 +82,47 @@ the rows are validated again inside PostgreSQL. Invalid rows (bad USN, unknown
 department, duplicate USN, etc.) are skipped with a reason; valid rows are
 inserted in one batch. Imports never overwrite existing records and never
 create login accounts.
+
+## Applying the Phase 2 migration
+
+After `0001_phase1_foundation.sql` is in place, paste and run
+`supabase/migrations/0002_phase2_daily_operations.sql` once in the SQL Editor.
+It is additive: no `DROP`, `TRUNCATE` or destructive top-level `DELETE`. It
+creates tables, RLS policies, indexes, trusted functions, grants, seeds and
+realtime publication entries. Never reset a remote project containing real data.
+
+Key Phase 2 tables:
+
+| Table | Purpose |
+| --- | --- |
+| `attendance_sessions`, `attendance_records` | Session lifecycle and one record per eligible student |
+| `class_tasks`, `task_audiences`, `task_submissions`, `task_submission_history` | Assignments, explicit OR targeting and submission history |
+| `stored_files` | R2 object metadata, ownership and upload status |
+| `visitor_purposes`, `visitor_records` | Configurable purposes and full PE Block visitor records |
+| `pe_rooms`, `room_activities`, `room_sessions` | Rooms, activity options and entry/exit sessions |
+| `qr_codes` | High-entropy QR tokens, themes and destinations |
+
+Important Phase 2 functions include `is_active_pe_student()`,
+`student_matches_task()`, `admin_create_attendance_session()`,
+`student_submit_attendance()`, `admin_review_attendance()`,
+`admin_finalise_attendance()`, `admin_save_class_task()`,
+`student_save_task_submission()`, `create_file_upload()`,
+`confirm_file_upload()`, `submit_visitor_entry()`, `get_today_visitors()`,
+`resolve_qr_token()`, `student_enter_room()`, `student_exit_room()`,
+`admin_close_room_session()`, `admin_set_qr_active()`,
+`admin_regenerate_qr()` and the PE-Admin-only `admin_log_action()`.
+The internal `write_audit()` helper is not granted to ordinary authenticated
+callers.
+
+`student_matches_task()` is defined after `task_audiences` so PostgreSQL can
+validate the SQL body during migration. RLS is enabled on every new table;
+public visitors only receive `get_today_visitors()` and `resolve_qr_token()`
+limited projections. Realtime is added for `attendance_records` and
+`room_sessions`.
+
+Detailed workflow guides are in [PHASE_2.md](PHASE_2.md),
+[ATTENDANCE_WORKFLOW.md](ATTENDANCE_WORKFLOW.md),
+[TASK_MANAGEMENT.md](TASK_MANAGEMENT.md),
+[VISITOR_REGISTER.md](VISITOR_REGISTER.md),
+[ROOM_MANAGEMENT.md](ROOM_MANAGEMENT.md), [QR_SYSTEM.md](QR_SYSTEM.md) and
+[R2_SETUP.md](R2_SETUP.md).
