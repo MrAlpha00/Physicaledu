@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import type { AuthOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/utils";
 
