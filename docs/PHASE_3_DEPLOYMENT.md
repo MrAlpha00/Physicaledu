@@ -44,7 +44,7 @@ services explicitly, and verify with real accounts before release.
    npm run build
    ```
 
-   Full suite in this work: 9 files / 70 tests. Phase 3 tests are
+   Full suite in this work: 9 files / 74 tests. Phase 3 tests are
    `tests/phase3-operations.test.ts`, `tests/phase3-schema.test.ts` and
    `tests/phase3-security.test.ts`. Migration assertions are static SQL checks.
 

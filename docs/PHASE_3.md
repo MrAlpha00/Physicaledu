@@ -102,7 +102,7 @@ to ordinary authenticated callers. Administrative actions write to
 ## Verification status
 
 - `npm run typecheck`, `npm run lint`, `npm test` and `npm run build` passed in
-  this work. The full Vitest suite is 9 files / 70 tests, including
+  this work. The full Vitest suite is 9 files / 74 tests, including
   `tests/phase3-operations.test.ts`, `tests/phase3-schema.test.ts` and
   `tests/phase3-security.test.ts`.
 - Migration checks are **static**: SQL shape, RLS coverage, additive safety,
