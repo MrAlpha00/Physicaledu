@@ -123,6 +123,7 @@ create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   student_directory_id uuid unique
     references public.student_directory (id) on delete set null,
+  requested_usn text not null check (requested_usn = public.normalize_usn(requested_usn)),
   full_name text not null check (btrim(full_name) <> ''),
   email text not null,
   verification_status text not null default 'pending'
@@ -133,6 +134,8 @@ create table public.profiles (
   updated_at timestamptz not null default now()
 );
 
+create unique index profiles_requested_usn_uidx
+  on public.profiles (requested_usn);
 create index profiles_verification_idx on public.profiles (verification_status);
 create index profiles_created_idx on public.profiles (created_at desc);
 
