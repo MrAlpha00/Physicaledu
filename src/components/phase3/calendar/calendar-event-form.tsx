@@ -45,6 +45,8 @@ export interface CalendarEventInitialValue {
   category: CalendarCategory;
   startsAt: string;
   endsAt: string;
+  startsAtIso: string;
+  endsAtIso: string;
   venue: string;
   visibility: CalendarVisibility;
   status: CalendarStatus;
@@ -112,8 +114,14 @@ export function CalendarEventForm({
     initial?.audiences.length ? initial.audiences.map(audienceToRow) : [{ audienceType: "all_students" } as AudienceRow],
   );
 
-  const startIso = istLocalInputToIso(startsAt);
-  const endIso = istLocalInputToIso(endsAt);
+  // Keep the stored instant while the local input is untouched so override
+  // keys continue to match existing rows exactly (including seconds).
+  const startIso = initial && startsAt === initial.startsAt
+    ? initial.startsAtIso
+    : istLocalInputToIso(startsAt);
+  const endIso = initial && endsAt === initial.endsAt
+    ? initial.endsAtIso
+    : istLocalInputToIso(endsAt);
 
   const preview = useMemo(() => {
     const syntheticEvent: Phase3CalendarEventRow = {

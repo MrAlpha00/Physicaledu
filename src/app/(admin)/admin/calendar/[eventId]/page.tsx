@@ -53,6 +53,8 @@ export default async function EditCalendarEventPage({
     category: event.category,
     startsAt: toIstLocalInput(event.startsAt),
     endsAt: toIstLocalInput(event.endsAt),
+    startsAtIso: event.startsAt,
+    endsAtIso: event.endsAt,
     venue: event.venue ?? "",
     visibility: event.visibility,
     status: event.status,
