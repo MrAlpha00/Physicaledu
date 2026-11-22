@@ -3,7 +3,9 @@
 VARSITY is a secure, purpose-built management platform for a college Physical
 Education department. Phase 1 establishes the foundation: student accounts, an
 official student directory, configurable departments, PE roster membership,
-role-based access and two distinct dashboards.
+role-based access and two distinct dashboards. Phase 2 adds the daily PE
+operations: attendance, class tasks, the digital visitor register, room
+entry/exit with live occupancy, QR posters and R2-backed file storage.
 
 The design direction is **VARSITY — Athletic Digital Experience**: collegiate
 athletics typography, a navy/chalk/lime palette and scoreboard-inspired data —
