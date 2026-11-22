@@ -40,7 +40,7 @@ export function AchievementReviewActions({
         <Button type="button" size="sm" variant="lime" disabled={pending || status === "verified"} onClick={() => decide("verified")}>
           Verify
         </Button>
-        <Button type="button" size="sm" variant="coral" disabled={pending || status === "rejected"} onClick={() => decide("rejected")}>
+        <Button type="button" size="sm" variant="destructive" disabled={pending || status === "rejected"} onClick={() => decide("rejected")}>
           Reject
         </Button>
         {status !== "pending" ? (
