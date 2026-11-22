@@ -184,7 +184,7 @@ export const gameRuleBlockSchema = z.object({
     "heading", "paragraph", "image", "image_gallery", "bullet_list",
     "numbered_instructions", "rules_section", "quote", "video_embed", "resource",
   ]),
-  content: z.record(z.unknown()).default({}),
+  content: z.record(z.string(), z.unknown()).default({}),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
 });
 export type GameRuleBlockInput = z.infer<typeof gameRuleBlockSchema>;

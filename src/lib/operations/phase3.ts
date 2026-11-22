@@ -1,4 +1,6 @@
 import type {
+  EquipmentInventoryStatus,
+  EquipmentTransactionStatus,
   Phase3CalendarEventRow,
   Phase3CalendarOverrideRow,
   Phase3EquipmentItemRow,
@@ -7,8 +9,6 @@ import type {
 } from "@/types/database";
 import type {
   CalendarOccurrenceView,
-  EquipmentInventoryStatus,
-  EquipmentTransactionStatus,
   Phase3AudienceInput,
   Phase3ReportRow,
 } from "@/types/domain";

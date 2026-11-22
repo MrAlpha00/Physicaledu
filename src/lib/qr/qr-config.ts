@@ -82,7 +82,7 @@ export function buildQrDestination(
 }
 
 export interface QrScanTarget {
-  kind: "visitor" | "room";
+  kind: "visitor" | "room" | "equipment";
   token: string;
   destination: string;
 }
@@ -109,6 +109,10 @@ export function parseQrScanValue(
   const room = url.pathname.match(/^\/room\/([A-Za-z0-9_-]{16,200})$/);
   if (room) {
     return { kind: "room", token: room[1], destination: `/room/${room[1]}` };
+  }
+  const equipment = url.pathname.match(/^\/equipment\/([A-Za-z0-9_-]{16,200})$/);
+  if (equipment) {
+    return { kind: "equipment", token: equipment[1], destination: `/equipment/${equipment[1]}` };
   }
   return null;
 }
