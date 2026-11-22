@@ -66,7 +66,7 @@ export default async function RoomScanPage({
     user
       ? supabase
           .from("room_sessions")
-          .select("id")
+          .select("id, room_id")
           .eq("user_id", user.id)
           .is("ended_at", null)
           .maybeSingle()

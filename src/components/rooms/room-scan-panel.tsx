@@ -9,24 +9,29 @@ import { Label } from "@/components/ui/label";
 
 export function RoomScanPanel({
   token,
+  roomId,
   roomName,
   requiresActivity,
   activities,
   activeSessionId,
+  activeSessionRoomId,
   isAuthenticated,
 }: {
   token: string;
+  roomId: string;
   roomName: string;
   requiresActivity: boolean;
   activities: Array<{ id: string; name: string }>;
   activeSessionId: string | null;
+  activeSessionRoomId: string | null;
   isAuthenticated: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [activityId, setActivityId] = useState("");
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const activeElsewhere = Boolean(activeSessionId);
+  const activeHere = activeSessionId !== null && activeSessionRoomId === roomId;
+  const activeElsewhere = activeSessionId !== null && !activeHere;
 
   function run(isExit: boolean) {
     setNotice(null);
@@ -70,11 +75,11 @@ export function RoomScanPanel({
         </p>
       ) : null}
 
-      {activeSessionId ? (
+      {activeHere ? (
         <div className="border-2 border-navy bg-card p-6">
-          <h2 className="text-2xl font-bold">You are currently in a room</h2>
+          <h2 className="text-2xl font-bold">You are currently in {roomName}</h2>
           <p className="mt-2 text-sm text-ink-muted">
-            Scan the exit QR on the notice board, or use the button below to close your active
+            Scan the exit QR on the notice board again, or use the button below to close this
             session.
           </p>
           <Button
@@ -87,6 +92,14 @@ export function RoomScanPanel({
             {pending ? <LoaderCircle className="animate-spin" /> : <LogOut />}
             Record exit now
           </Button>
+        </div>
+      ) : activeElsewhere ? (
+        <div className="border-l-4 border-l-coral bg-coral/10 p-6">
+          <h2 className="text-2xl font-bold">Close your other room session first</h2>
+          <p className="mt-2 text-sm text-ink-muted">
+            You have an open session in a different PE room. Scan that room&apos;s QR to record
+            your exit before entering {roomName}.
+          </p>
         </div>
       ) : (
         <div className="border-2 border-navy bg-card p-6">
