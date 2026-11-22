@@ -534,9 +534,18 @@ alter table public.pe_memberships enable row level security;
 alter table public.import_batches enable row level security;
 alter table public.audit_logs enable row level security;
 
-create policy "departments_read_active_or_admin"
+create policy "departments_read_active_admin_or_self"
   on public.departments for select to authenticated
-  using (is_active or public.is_pe_admin());
+  using (
+    is_active
+    or public.is_pe_admin()
+    or exists (
+      select 1
+      from public.student_directory sd
+      join public.profiles p on p.student_directory_id = sd.id
+      where sd.department_id = departments.id and p.id = auth.uid()
+    )
+  );
 
 create policy "departments_admin_insert"
   on public.departments for insert to authenticated
