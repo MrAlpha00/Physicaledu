@@ -53,11 +53,11 @@ academic year, semester, biography, preferred sports, sports interests and
 `is_public = true` and an active directory record.
 
 The public page never includes USN, email, contact details, verification notes,
-pending or rejected achievements, private profile fields, participation records
-or evidence files. Guests who are not entitled to a profile see a neutral “not
-public” state. The upload RPC does not grant public visibility to profile
-photos; the narrow RLS carve-out for an already-public linked photo is not used
-by the normal UI. Keep the R2 bucket private.
+pending or rejected achievements, private profile fields, participation records,
+evidence files or the profile photo. Guests who are not entitled to a profile see
+a neutral “not public” state. Profile photos stay private: the upload RPC/RLS
+allows only the uploader or a PE Admin to download them, and public profile pages
+never expose the image file. Keep the R2 bucket private.
 
 ## Manual test checklist
 

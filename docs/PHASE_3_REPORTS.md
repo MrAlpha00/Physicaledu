@@ -46,7 +46,7 @@ resolver so a chart, file and printout agree.
 | Sensitive fields | The visitors dataset includes names and USNs; feedback/achievement exports include student names; handle files as department records |
 | Caching | `no-store` on the API; no presigned URLs or secrets in report rows |
 | Audit | Every export is logged with a row count; investigate unexpected bulk exports |
-| Volume | Large queries are bounded (up to 20,000 rows on core datasets); narrow the window for big departments |
+| Volume | Attendance and visitor queries are bounded to 20,000 rows; other datasets use the existing admin read limits. Narrow the window for big departments |
 
 Email recipient addresses are intentionally not a report dataset. Use the
 admin-only email queue when investigating delivery, and never paste addresses

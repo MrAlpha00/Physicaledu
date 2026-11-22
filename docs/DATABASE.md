@@ -207,8 +207,9 @@ DB-enforced Asia/Kolkata daily limit and three attempts per recipient.
 
 Public reads are limited to published calendar events, published game rules,
 published game-rule media and opted-in public sports projections with verified
-achievements. No public role can read feedback, notifications, email data,
-private files, USNs or pending achievements.
+achievements. Public sports projections exclude photos. No public role can read
+feedback, notifications, email data, private files (including profile photos),
+USNs or pending achievements.
 
 Module guides: [PHASE_3.md](PHASE_3.md),
 [PHASE_3_EQUIPMENT.md](PHASE_3_EQUIPMENT.md),

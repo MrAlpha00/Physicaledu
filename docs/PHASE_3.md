@@ -27,9 +27,10 @@ applied remotely and no remote database was reset. See
 | Sports profiles | [PHASE_3_SPORTS_PROFILES.md](PHASE_3_SPORTS_PROFILES.md) | Opt-in public profiles, pending achievements and admin verification |
 | Reports | [PHASE_3_REPORTS.md](PHASE_3_REPORTS.md) | Live dashboards, `.xlsx`/CSV exports and a PE-Admin print view |
 
-Recharts is used for the report charts and Svix verifies Resend webhook
-signatures. ExcelJS continues to produce genuine workbooks. See `package.json`
-for exact dependency ranges.
+Dependencies added: `recharts` for report charts and `svix` for Resend webhook
+signature verification (requested minimums `recharts@^3.6.0` and
+`svix@^1.45.0`; `package.json` declares the current ranges). ExcelJS continues
+to produce genuine workbooks.
 
 ## Routes
 
@@ -87,8 +88,9 @@ to ordinary authenticated callers. Administrative actions write to
   [R2_SETUP.md](R2_SETUP.md).
 - **Public exposure is minimal.** Only published game rules, published public
   calendar events and explicitly public sports profiles are available to guests.
-  Drafts, internal feedback notes, private student data, USNs, email addresses
-  and pending achievements are never public.
+  Public sports profiles exclude photos. Drafts, internal feedback notes,
+  private student data, USNs, email addresses, private files and pending
+  achievements are never public.
 - **Email is optional and server-only.** Without `RESEND_API_KEY` and
   `RESEND_FROM_EMAIL`, in-app notifications still work and admins see a warning.
   Secrets are never placed in `NEXT_PUBLIC_*`, client code, public pages or docs.

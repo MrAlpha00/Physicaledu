@@ -1364,16 +1364,24 @@ create or replace function public.admin_correct_equipment_transaction(
 ) returns setof public.equipment_transactions
 language plpgsql security definer set search_path = public, pg_temp
 as $$
+declare
+  v_status text;
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
   if btrim(coalesce(p_reason, '')) = '' then raise exception 'A correction reason is required'; end if;
 
+  select status into v_status from public.equipment_transactions where id = p_transaction_id for update;
+  if not found then raise exception 'Transaction not found'; end if;
+  -- Status changes affect stock and asset state; they must go through the
+  -- audited issue/return RPCs, never through a metadata correction.
+  if p_status is not null and p_status is distinct from v_status then
+    raise exception 'Use the issue/return flow to change transaction status';
+  end if;
+
   update public.equipment_transactions set
     expected_return_at = coalesce(p_expected_return_at, expected_return_at),
-    status = coalesce(p_status, status),
     correction_reason = btrim(p_reason)
   where id = p_transaction_id;
-  if not found then raise exception 'Transaction not found'; end if;
 
   perform public.phase3_log('equipment_transaction_corrected', 'equipment_transactions',
     p_transaction_id::text, jsonb_build_object('reason', p_reason, 'status', p_status));
@@ -1401,6 +1409,13 @@ begin
   if v_item.available_quantity < v_quantity then
     raise exception 'Not enough available stock to place under maintenance';
   end if;
+  if v_item.tracking_mode = 'individual' and v_asset_id is null then
+    raise exception 'Choose the individual asset under maintenance';
+  end if;
+  if v_asset_id is not null and not exists (
+    select 1 from public.equipment_assets a
+    where a.id = v_asset_id and a.item_id = v_item.id and a.status = 'available'
+  ) then raise exception 'Asset does not belong to this item or is not available'; end if;
 
   if p_record_id is null then
     insert into public.equipment_maintenance_records (
@@ -1490,8 +1505,8 @@ begin
   update public.equipment_maintenance_records set
     status = p_status,
     resolution_notes = nullif(p_resolution_notes, ''),
-    cost = p_cost,
-    cost_authorised_by = case when p_cost is not null then auth.uid() else null end,
+    cost = coalesce(p_cost, cost),
+    cost_authorised_by = case when p_cost is not null then auth.uid() else cost_authorised_by end,
     started_at = case when p_status = 'in_progress' and started_at is null then now() else started_at end,
     completed_at = case when p_status = 'completed' then now() else completed_at end
   where id = p_record_id;
@@ -1987,10 +2002,11 @@ declare
   v_user_id uuid;
 begin
   if not public.is_pe_admin() then raise exception 'PE Admin access required'; end if;
-  if p_audiences is null or jsonb_array_length(p_audiences) = 0 then
+  if p_data is null or p_audiences is null
+     or jsonb_typeof(p_audiences) <> 'array' or jsonb_array_length(p_audiences) = 0 then
     raise exception 'Select at least one audience';
   end if;
-  if p_daily_limit < 1 or p_daily_limit > 100 then
+  if p_daily_limit is null or p_daily_limit < 1 or p_daily_limit > 100 then
     raise exception 'Daily limit must be between 1 and 100';
   end if;
 
@@ -2544,7 +2560,15 @@ begin
       new.student_directory_id, 'attendance', new.session_id::text,
       (select title from public.attendance_sessions where id = new.session_id),
       coalesce(new.reviewed_at, new.updated_at), true
-    ) on conflict (student_directory_id, source_type, source_reference) do nothing;
+    )
+    on conflict (student_directory_id, source_type, source_reference) do update set
+      activity_title = excluded.activity_title,
+      participated_at = excluded.participated_at,
+      is_verified = true;
+  else
+    delete from public.sports_participation_records
+    where student_directory_id = new.student_directory_id
+      and source_type = 'attendance' and source_reference = new.session_id::text;
   end if;
   return new;
 end;
@@ -2566,7 +2590,16 @@ begin
       new.student_directory_id, 'class_task', new.task_id::text || ':' || new.id::text,
       (select title from public.class_tasks where id = new.task_id),
       coalesce(new.reviewed_at, new.submitted_at, new.created_at), true
-    ) on conflict (student_directory_id, source_type, source_reference) do nothing;
+    )
+    on conflict (student_directory_id, source_type, source_reference) do update set
+      activity_title = excluded.activity_title,
+      participated_at = excluded.participated_at,
+      is_verified = true;
+  else
+    delete from public.sports_participation_records
+    where student_directory_id = new.student_directory_id
+      and source_type = 'class_task'
+      and source_reference = new.task_id::text || ':' || new.id::text;
   end if;
   return new;
 end;

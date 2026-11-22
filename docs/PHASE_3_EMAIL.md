@@ -53,11 +53,12 @@ types are acknowledged and ignored.
 | `email.delivered` | `delivered` with `delivered_at` |
 | `email.bounced` | `bounced` with failure time |
 | `email.complained` | `bounced` with failure time |
-| `email.failed` | `failed` event recorded |
+| `email.failed` | `failed` status with failure time and bounded error |
 | Other | Acknowledged, ignored |
 
 `email_delivery_events` uses a unique provider event ID to make webhook handling
-idempotent. Accepted by Resend is **not** the same as delivered: the inbox and
+idempotent; a repeated event does not reapply a stale status or overwrite
+timestamps. Accepted by Resend is **not** the same as delivered: the inbox and
 dashboard show accepted, webhook-delivered and failed counts separately. The
 webhook persists only message ID and event metadata; it never logs or returns
 recipient addresses.

@@ -231,16 +231,12 @@ const correctionSchema = z.object({
   transactionId: z.string().uuid(),
   reason: z.string().trim().min(5, "Give a reason for the correction").max(300),
   expectedReturnAt: z.string().optional(),
-  status: z
-    .enum(["issued", "partially_returned", "returned", "overdue", "lost", "damaged", "cancelled"])
-    .optional(),
 });
 
 export async function correctEquipmentTransaction(input: {
   transactionId: string;
   reason: string;
   expectedReturnAt?: string;
-  status?: "issued" | "partially_returned" | "returned" | "overdue" | "lost" | "damaged" | "cancelled";
 }): Promise<ActionState> {
   await requirePeAdmin();
   const parsed = correctionSchema.safeParse(input);
@@ -258,7 +254,6 @@ export async function correctEquipmentTransaction(input: {
     p_transaction_id: parsed.data.transactionId,
     p_reason: parsed.data.reason,
     p_expected_return_at: expectedReturnAt,
-    p_status: parsed.data.status ?? null,
   });
   if (error) return { status: "error", message: error.message || "Correction could not be saved." };
   refreshEquipment();

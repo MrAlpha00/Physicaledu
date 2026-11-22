@@ -54,7 +54,8 @@ zero available units until assets are tagged.
 3. A return may be partial. Returning a damaged or unusable unit moves it into
    the damaged bucket; otherwise it returns to available stock.
 4. Overdue status is derived from expected return time for open loans. PE Admin
-   can correct the due date/status with a mandatory reason.
+   can correct the due date and metadata with a mandatory reason; a status change
+   must go through the audited issue/return flow, not a metadata correction.
 5. Students see only their own transactions and return records. Admins see all.
 
 Issue, return, correction, maintenance and QR creation actions are audited via
@@ -63,12 +64,15 @@ Issue, return, correction, maintenance and QR creation actions are audited via
 ### Maintenance
 
 1. Create a maintenance record from an item or from a feedback request
-   (`source_feedback_id`). Reported units move from available to maintenance.
+   (`source_feedback_id`). For individual items choose the specific available
+   asset; for bulk items report units from available stock. Reported units move
+   from available to maintenance.
 2. Advance through `reported`, `under_review`, `scheduled`, `in_progress` to a
    terminal state: `completed`, `unrepairable` or `cancelled`.
 3. Completion returns units to available stock; unrepairable units move to
    damaged. Terminal records cannot be reopened.
-4. Costs are optional, non-negative and record the authorising admin.
+4. Costs are optional, non-negative and record the authorising admin. Leaving
+   the cost blank keeps the existing cost and authorisation intact.
 
 ## Operational runbook
 

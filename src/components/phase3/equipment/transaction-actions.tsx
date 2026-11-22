@@ -15,15 +15,6 @@ import type { ActionState } from "@/types/domain";
 import { EquipmentActionNotice } from "./equipment-action-notice";
 import { EQUIPMENT_CONDITION_OPTIONS, Field, FormSelect } from "./form-controls";
 
-const CORRECTION_STATUSES = [
-  "issued",
-  "partially_returned",
-  "returned",
-  "lost",
-  "damaged",
-  "cancelled",
-] as const;
-
 export function TransactionActions({ transaction }: { transaction: EquipmentTransactionView }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -35,7 +26,6 @@ export function TransactionActions({ transaction }: { transaction: EquipmentTran
   const [returnNotes, setReturnNotes] = useState("");
   const [reason, setReason] = useState("");
   const [correctedReturn, setCorrectedReturn] = useState(toIstLocalInput(transaction.expectedReturnAt));
-  const [correctedStatus, setCorrectedStatus] = useState("");
 
   function run(action: () => Promise<ActionState>, clear: () => void) {
     setNotice(null);
@@ -153,20 +143,6 @@ export function TransactionActions({ transaction }: { transaction: EquipmentTran
               onChange={(event) => setCorrectedReturn(event.target.value)}
             />
           </Field>
-          <Field label="Status override" htmlFor={`correction-status-${transaction.id}`}>
-            <FormSelect
-              id={`correction-status-${transaction.id}`}
-              value={correctedStatus}
-              onChange={(event) => setCorrectedStatus(event.target.value)}
-            >
-              <option value="">Keep current status</option>
-              {CORRECTION_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status.replaceAll("_", " ")}
-                </option>
-              ))}
-            </FormSelect>
-          </Field>
           <Button
             size="sm"
             variant="outline"
@@ -178,13 +154,9 @@ export function TransactionActions({ transaction }: { transaction: EquipmentTran
                     transactionId: transaction.id,
                     reason,
                     expectedReturnAt: correctedReturn,
-                    status: correctedStatus
-                      ? (correctedStatus as (typeof CORRECTION_STATUSES)[number])
-                      : undefined,
                   }),
                 () => {
                   setReason("");
-                  setCorrectedStatus("");
                 },
               )
             }
