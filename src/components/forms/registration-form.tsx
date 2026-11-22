@@ -121,6 +121,7 @@ export function RegistrationForm({
           />
         </Field>
         <Field
+          htmlFor="email"
           label="College email address"
           error={errors.email?.message}
           className="sm:col-span-2"
