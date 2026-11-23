@@ -12,6 +12,12 @@ export async function PublicHeader() {
         <Brand />
         <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
           <Link
+            href="/events"
+            className="text-xs font-bold uppercase tracking-[0.14em] text-navy/70 transition-colors hover:text-navy"
+          >
+            Events
+          </Link>
+          <Link
             href="/#platform"
             className="text-xs font-bold uppercase tracking-[0.14em] text-navy/70 transition-colors hover:text-navy"
           >

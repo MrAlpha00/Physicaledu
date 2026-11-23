@@ -47,6 +47,8 @@ export function StudentShell({
         ]
       : []),
     { href: "/tasks", label: "Tasks", icon: BookOpenCheck },
+    { href: "/my-events", label: "My events", icon: Trophy },
+    { href: "/organizer", label: "Organiser", icon: ClipboardList },
     { href: "/equipment", label: "Equipment", icon: Package },
     { href: "/calendar", label: "Calendar", icon: CalendarDays },
     { href: "/feedback", label: "Feedback", icon: MessageSquareText },
