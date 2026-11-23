@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { removeEligibilityRule, setEventStatus } from "@/app/(admin)/admin/events/actions";
 import {
   generateTournamentAction,
+  saveManualPairings,
   setBracketLock,
   updateMatchAction,
   correctResultAction,
