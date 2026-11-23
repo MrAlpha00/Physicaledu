@@ -123,17 +123,10 @@ describe('Phase 4 validation schemas', () => {
       transactionReference: 'TXN123',
     }).success).toBe(true)
     expect(invitationSchema.parse({ competitionId: id, studentDirectoryId: id2 }).expiresHours).toBe(72)
-    expect(invitationTokenSchemaSafeParse()).toBe(false)
+    expect(invitationTokenSchema.safeParse({ token: 'short' }).success).toBe(false)
     expect(participantInvitationTokenSchema.safeParse({
       token: 'abcdefghijklmnopqrstuvwxyz123456',
       accept: true,
     }).success).toBe(true)
   })
 })
-
-function invitationTokenSchemaSafeParse() {
-  // Token values must be long enough to resist guessing.
-  return import('../src/lib/validations/phase4').then(module =>
-    module.invitationTokenSchema.safeParse({ token: 'short' }).success,
-  ) as unknown as boolean
-}
