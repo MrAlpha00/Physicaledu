@@ -188,9 +188,14 @@ create table public.import_batches (
 
 create index import_batches_created_idx on public.import_batches (created_at desc);
 
+-- The column is declared in the table definition above. Add only the missing
+-- foreign key here. Repeating `add column` raises 42701 and, in the SQL Editor's
+-- implicit transaction, rolls back the whole Phase 1 script (including
+-- public.user_roles), which is the historical cause of the 42P01 bootstrap error.
 alter table public.student_directory
-  add column source_import_batch_id uuid
-    references public.import_batches (id) on delete set null;
+  add constraint student_directory_source_import_batch_fkey
+  foreign key (source_import_batch_id)
+  references public.import_batches (id) on delete set null;
 
 create table public.audit_logs (
   id bigint generated always as identity primary key,

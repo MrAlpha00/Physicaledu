@@ -2035,8 +2035,25 @@ grant execute on function public.phase4_event_is_public(uuid) to anon, authentic
 grant execute on function public.phase4_competition_is_public(uuid) to anon, authenticated;
 grant execute on function public.phase4_can_view_file(uuid) to anon, authenticated;
 
-alter publication supabase_realtime add table public.tournament_matches;
-alter publication supabase_realtime add table public.competition_entries;
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public' and tablename = 'tournament_matches'
+    ) then
+      alter publication supabase_realtime add table public.tournament_matches;
+    end if;
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public' and tablename = 'competition_entries'
+    ) then
+      alter publication supabase_realtime add table public.competition_entries;
+    end if;
+  end if;
+end $$;
 
 /* ------------------------------------------------------------------------- */
 /* R2 metadata RPCs — private objects, signed URLs only                       */

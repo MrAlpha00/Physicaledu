@@ -1295,13 +1295,24 @@ grant execute on function public.phase5_submit_action(text, uuid, integer, integ
 /* -------------------------------------------------------------------------- */
 
 do $$
+declare
+  v_table text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    alter publication supabase_realtime add table public.game_matches;
-    alter publication supabase_realtime add table public.game_match_players;
-    alter publication supabase_realtime add table public.game_match_actions;
-    alter publication supabase_realtime add table public.game_challenges;
-    alter publication supabase_realtime add table public.game_ratings;
+    foreach v_table in array array[
+      'game_matches', 'game_match_players', 'game_match_actions',
+      'game_challenges', 'game_ratings'
+    ] loop
+      if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime'
+          and schemaname = 'public' and tablename = v_table
+      ) then
+        execute format(
+          'alter publication supabase_realtime add table public.%I', v_table
+        );
+      end if;
+    end loop;
   end if;
 end $$;
 

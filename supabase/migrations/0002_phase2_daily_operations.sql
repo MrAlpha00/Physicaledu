@@ -1764,13 +1764,17 @@ grant select, insert, update, delete on public.visitor_purposes to authenticated
 
 revoke all on function public.ist_day_start(date) from public;
 revoke all on function public.ist_day_end(date) from public;
-revoke all on function public.student_directory_id_for_user(uuid) from public;
+-- This SECURITY DEFINER helper is called by the RLS policies above as the
+-- authenticated invoker; keep it revoked from PUBLIC and grant only to
+-- authenticated (below). Removing EXECUTE entirely breaks attendance reads.
+revoke all on function public.student_directory_id_for_user(uuid) from public, anon;
 revoke all on function public.is_active_pe_student(uuid) from public;
 revoke all on function public.student_matches_task(uuid, uuid) from public;
 revoke all on function public.write_audit(text, text, text, jsonb) from public;
 revoke all on function public.admin_log_action(text, text, text, jsonb) from public;
 revoke all on function public.new_qr_token() from public;
 
+grant execute on function public.student_directory_id_for_user(uuid) to authenticated;
 grant execute on function public.is_active_pe_student(uuid) to authenticated;
 grant execute on function public.student_matches_task(uuid, uuid) to authenticated;
 grant execute on function public.submit_visitor_entry(text, text, text, uuid, smallint, smallint, uuid, text, text, boolean) to anon, authenticated;
@@ -1799,7 +1803,19 @@ grant execute on function public.admin_log_action(text, text, text, jsonb) to au
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    alter publication supabase_realtime add table public.attendance_records;
-    alter publication supabase_realtime add table public.room_sessions;
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public' and tablename = 'attendance_records'
+    ) then
+      alter publication supabase_realtime add table public.attendance_records;
+    end if;
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public' and tablename = 'room_sessions'
+    ) then
+      alter publication supabase_realtime add table public.room_sessions;
+    end if;
   end if;
 end $$;
