@@ -57,8 +57,9 @@ describe("Phase 5 — input validation", () => {
       seq: 1, expectedVersion: 1, actor: 2, type: "move", payload: {},
     }).success).toBe(false);
     expect(gameActionSchema.safeParse({
-      seq: 1, expectedVersion: 1, actor: 0, type: "finish", payload: { winner: 0, scores: [9, 0] },
+      seq: 1, expectedVersion: 1, actor: 0, type: "MOVE", payload: {},
     }).success).toBe(false);
+    expect(Object.keys(gameActionSchema.shape)).toEqual(["seq", "expectedVersion", "actor", "type", "payload"]);
   });
 
   it("validates admin settings, reports and audited adjustments", () => {
@@ -120,7 +121,7 @@ describe("Phase 5 — catalog, registry and transport", () => {
     expect(validateEnvelope(state, base, engine, 0)).toBeNull();
     expect(validateEnvelope(state, { ...base, seq: 2 }, engine, 0)).toContain("sequence");
     expect(validateEnvelope(state, { ...base, expectedVersion: 2 }, engine, 0)).toContain("outdated");
-    expect(validateEnvelope(state, { ...base, actor: 1 }, engine, 1)).toContain("another player");
+    expect(validateEnvelope(state, { ...base, actor: 1 }, engine, 1)).toContain("turn");
   });
 });
 
@@ -131,7 +132,7 @@ describe("Phase 5 — static architecture guards", () => {
 
   it("keeps game rules, persistence and realtime transport separated", () => {
     expect(realtime).toContain("Realtime transport only");
-    expect(realtime).toContain("never treated as an authority for game state");
+    expect(realtime).toContain("nothing received here is ever treated as an authority for game state");
     expect(matchService).toContain("Authoritative match transitions");
     expect(migration).toContain("create table public.game_match_actions");
   });
