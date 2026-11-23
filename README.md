@@ -217,6 +217,31 @@ npm test           # Vitest unit tests
   [PHASE_3_REPORTS.md](docs/PHASE_3_REPORTS.md),
   [PHASE_3_DEPLOYMENT.md](docs/PHASE_3_DEPLOYMENT.md).
 
+## Phase 4 features
+
+- Sports events with unlimited sports, configurable team/individual rules,
+  eligibility and weight privacy, custom questions, approval workflows and
+  per-entry rule snapshots.
+- Team and individual registration with directory-linked members, captain and
+  participant invitations, roster confirmation, waitlists and audited reviews.
+- Public payment QR plus private R2 proof uploads; verification is a separate
+  admin workflow and never exposed to organisers or public pages.
+- Pure TypeScript tournament engine for knockout (with byes and optional
+  third-place match), round robin and group knockout; deterministic seeded,
+  random and manual draws; graph validation before transactional persistence.
+- React Flow bracket canvas driven by authoritative database state. Dragging
+  nodes persists positions only; public pages get a read-only locked canvas.
+- Scoped per-sport organiser invitations and match management, live results,
+  winner advancement, standings, notifications, calendar sync, public results
+  and idempotent achievement suggestions.
+- Audited XLSX/CSV exports and print views from shared row builders; private
+  proof downloads pass through RLS-aware signed URLs.
+- Guides: [PHASE_4.md](docs/PHASE_4.md),
+  [PHASE_4_EVENTS.md](docs/PHASE_4_EVENTS.md),
+  [PHASE_4_TOURNAMENTS.md](docs/PHASE_4_TOURNAMENTS.md),
+  [PHASE_4_ORGANIZERS.md](docs/PHASE_4_ORGANIZERS.md),
+  [PHASE_4_DEPLOYMENT.md](docs/PHASE_4_DEPLOYMENT.md).
+
 ## Architecture
 
 ```text
