@@ -116,6 +116,7 @@ export async function saveSport(input: z.input<typeof sportSchema>): Promise<
     } as unknown as Json,
     auto_advance: data.autoAdvance,
     organizer_results_require_approval: data.organizerResultsRequireApproval,
+    ...(data.imageFileId ? { image_file_id: data.imageFileId } : {}),
   };
   const { data: saved, error } = data.id
     ? await supabase.from("event_sports").update(payload).eq("id", data.id).select("id").maybeSingle()

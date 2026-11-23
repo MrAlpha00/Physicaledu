@@ -67,6 +67,7 @@ export const sportSchema = z.object({
   autoAdvance: z.boolean().default(true),
   organizerResultsRequireApproval: z.boolean().default(false),
   publicRules: z.string().trim().max(8000).optional().default(""),
+  imageFileId: z.string().uuid().nullable().optional(),
 });
 
 export type SportInput = z.infer<typeof sportSchema>;
