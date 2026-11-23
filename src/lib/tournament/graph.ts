@@ -16,6 +16,7 @@ export interface GraphValidationResult {
 }
 
 export type CanvasNodeData = {
+  [key: string]: unknown;
   label: string;
   sublabel?: string;
   matchKey?: string;
