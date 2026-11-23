@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requirePeAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { notifyPhaseUsers } from "@/lib/operations/phase4";
+import { memberConfirmationSchema } from "@/lib/validations/phase4";
 
 const reviewSchema = z.object({
   entryId: z.string().uuid(),
@@ -116,6 +117,42 @@ export async function editEntryDetails(input: z.input<typeof editEntrySchema>): 
     details: { before: { seed: entry.seed, teamName: entry.team_name }, after: parsed.data, reason: parsed.data.note },
   });
   if (sport) refresh(sport.event_id, entry.competition_id);
-  await notifyPhaseUsers([], "Registration edited", parsed.data.note, "future_event", "/my-events");
   return { status: "success", message: "Registration updated and audited." };
+}
+
+export async function confirmEntryMemberAction(
+  input: z.input<typeof memberConfirmationSchema>,
+): Promise<{ status: "success" | "error"; message: string }> {
+  await requirePeAdmin();
+  const parsed = memberConfirmationSchema.safeParse(input);
+  if (!parsed.success) return { status: "error", message: firstIssue(parsed.error) };
+  const supabase = await createClient();
+  const admin = await requirePeAdmin();
+  const { data: member } = await supabase
+    .from("competition_entry_members").select("entry_id,confirmation_status,user_id")
+    .eq("id", parsed.data.memberId).maybeSingle();
+  if (!member) return { status: "error", message: "Participant not found." };
+  const { error } = await supabase.from("competition_entry_members").update({
+    confirmation_status: parsed.data.status,
+    confirmed_at: parsed.data.status === "pending" ? null : new Date().toISOString(),
+    verified_by: parsed.data.status === "verified" ? admin.id : null,
+    verified_at: parsed.data.status === "verified" ? new Date().toISOString() : null,
+  }).eq("id", parsed.data.memberId);
+  if (error) return { status: "error", message: error.message };
+  const { data: entry } = await supabase
+    .from("competition_entries").select("competition_id").eq("id", member.entry_id).maybeSingle();
+  const { data: sport } = entry
+    ? await supabase.from("event_sports").select("event_id").eq("id", entry.competition_id).maybeSingle()
+    : { data: null };
+  if (member.user_id) {
+    await notifyPhaseUsers(
+      [member.user_id],
+      "Roster status updated",
+      `Your registration roster is now ${parsed.data.status}.`,
+      "future_event",
+      "/my-events",
+    );
+  }
+  if (sport && entry) refresh(sport.event_id, entry.competition_id);
+  return { status: "success", message: `Participant marked ${parsed.data.status}.` };
 }

@@ -1466,6 +1466,48 @@ begin
 end;
 $$;
 
+create or replace function public.phase4_organizer_update_match(
+  p_match_id uuid, p_data jsonb
+) returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_match public.tournament_matches%rowtype;
+  v_competition_id uuid;
+  v_status text;
+begin
+  select * into v_match from public.tournament_matches where id = p_match_id for update;
+  if not found then raise exception 'Match not found'; end if;
+  select d.competition_id into v_competition_id from public.tournament_draws d where d.id = v_match.draw_id;
+  if not public.phase4_is_admin() then
+    if not public.phase4_has_sport_access(v_competition_id) then
+      raise exception 'You are not assigned to this sport.';
+    end if;
+    if v_match.organizer_id is not null and v_match.organizer_id <> auth.uid() then
+      raise exception 'This match is assigned to another organiser.';
+    end if;
+  end if;
+  if exists (select 1 from public.tournament_match_results r where r.match_id = p_match_id) then
+    raise exception 'A submitted result cannot be changed through match management.';
+  end if;
+
+  v_status := case when p_data ? 'status' then p_data->>'status' else v_match.status end;
+  if v_status not in ('scheduled', 'ready', 'ongoing', 'postponed', 'cancelled', 'disputed') then
+    raise exception 'Unsupported match status.';
+  end if;
+
+  update public.tournament_matches set
+    status = v_status,
+    starts_at = case when p_data ? 'startsAt' then nullif(p_data->>'startsAt', '')::timestamptz else starts_at end,
+    ends_at = case when p_data ? 'endsAt' then nullif(p_data->>'endsAt', '')::timestamptz else ends_at end,
+    venue = case when p_data ? 'venue' then nullif(p_data->>'venue', '') else venue end,
+    notes = case when p_data ? 'notes' then nullif(p_data->>'notes', '') else notes end,
+    updated_at = now()
+  where id = p_match_id;
+
+  insert into public.organizer_activity_logs (competition_id, user_id, match_id, action, details)
+  values (v_competition_id, auth.uid(), p_match_id, 'match_updated', p_data);
+end;
+$$;
+
 create or replace function public.phase4_create_organizer_invitation(
   p_competition_id uuid, p_student_directory_id uuid, p_expires_hours integer default 72
 ) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
@@ -1856,6 +1898,69 @@ begin
 end;
 $$;
 
+create or replace function public.phase4_submit_payment_proof(
+  p_entry_id uuid, p_proof_file_id uuid, p_transaction_reference text default null,
+  p_claimed_amount numeric default null
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_entry public.competition_entries%rowtype;
+  v_settings public.competition_payment_settings%rowtype;
+  v_payment_id uuid;
+  v_admins uuid[];
+begin
+  if auth.uid() is null then raise exception 'Sign in to submit payment proof.'; end if;
+  if not public.phase4_owns_entry(p_entry_id) then
+    raise exception 'You cannot submit payment for this entry.';
+  end if;
+  select * into v_entry from public.competition_entries where id = p_entry_id for update;
+  if not found then raise exception 'Registration not found.'; end if;
+  if v_entry.status in ('withdrawn', 'rejected') then
+    raise exception 'This registration cannot be paid.';
+  end if;
+  select * into v_settings from public.competition_payment_settings
+    where competition_id = v_entry.competition_id;
+  if coalesce(v_settings.is_required, false) is false then
+    raise exception 'Payment is not required for this competition.';
+  end if;
+  if not exists (
+    select 1 from public.phase4_files f
+    where f.id = p_proof_file_id and f.parent_type = 'payment_proof'
+      and f.parent_id = p_entry_id and f.uploader_id = auth.uid()
+      and f.upload_status = 'confirmed') then
+    raise exception 'Attach a confirmed payment proof for this registration.';
+  end if;
+
+  insert into public.competition_payment_records (
+    entry_id, proof_file_id, transaction_reference, claimed_amount,
+    status, note, verified_by, verified_at
+  ) values (
+    p_entry_id, p_proof_file_id, nullif(btrim(coalesce(p_transaction_reference, '')), ''),
+    p_claimed_amount, 'pending_verification', null, null, null
+  ) on conflict (entry_id) do update set
+    proof_file_id = excluded.proof_file_id,
+    transaction_reference = excluded.transaction_reference,
+    claimed_amount = excluded.claimed_amount,
+    status = 'pending_verification', note = null,
+    verified_by = null, verified_at = null, updated_at = now()
+  returning id into v_payment_id;
+
+  update public.competition_entries
+  set payment_status = 'pending_verification', updated_at = now()
+  where id = p_entry_id;
+
+  insert into public.payment_verification_history (payment_id, actor_id, action, to_status, note)
+  values (v_payment_id, auth.uid(), 'proof_submitted', 'pending_verification', null);
+
+  select coalesce(array_agg(ur.user_id), '{}'::uuid[]) into v_admins
+  from public.user_roles ur where ur.role = 'pe_admin';
+  perform public.phase4_notify_users(
+    v_admins, 'Payment proof submitted',
+    'A payment proof is waiting for verification.', 'future_event', '/admin/events/dashboard');
+
+  return jsonb_build_object('paymentId', v_payment_id, 'status', 'pending_verification');
+end;
+$$;
+
 create or replace function public.phase4_respond_participant_invitation(
   p_token text, p_accept boolean
 ) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
@@ -1895,6 +2000,7 @@ revoke all on function public.phase4_set_draw_lock(uuid, boolean, text) from pub
 revoke all on function public.phase4_submit_match_result(uuid, jsonb, boolean) from public;
 revoke all on function public.phase4_correct_match_result(uuid, jsonb, text) from public;
 revoke all on function public.phase4_admin_update_match(uuid, jsonb, text) from public;
+revoke all on function public.phase4_organizer_update_match(uuid, jsonb) from public;
 revoke all on function public.phase4_create_organizer_invitation(uuid, uuid, integer) from public;
 revoke all on function public.phase4_accept_organizer_invitation(text) from public;
 revoke all on function public.phase4_revoke_organizer_assignment(uuid, text) from public;
@@ -1902,6 +2008,7 @@ revoke all on function public.phase4_revoke_organizer_invitation(uuid, text) fro
 revoke all on function public.phase4_submit_entry(uuid, jsonb) from public;
 revoke all on function public.phase4_review_entry(uuid, text, text) from public;
 revoke all on function public.phase4_verify_payment(uuid, text, text) from public;
+revoke all on function public.phase4_submit_payment_proof(uuid, uuid, text, numeric) from public;
 revoke all on function public.phase4_respond_participant_invitation(text, boolean) from public;
 
 grant execute on function public.phase4_validate_plan(jsonb) to authenticated;
@@ -1911,6 +2018,7 @@ grant execute on function public.phase4_set_draw_lock(uuid, boolean, text) to au
 grant execute on function public.phase4_submit_match_result(uuid, jsonb, boolean) to authenticated;
 grant execute on function public.phase4_correct_match_result(uuid, jsonb, text) to authenticated;
 grant execute on function public.phase4_admin_update_match(uuid, jsonb, text) to authenticated;
+grant execute on function public.phase4_organizer_update_match(uuid, jsonb) to authenticated;
 grant execute on function public.phase4_create_organizer_invitation(uuid, uuid, integer) to authenticated;
 grant execute on function public.phase4_accept_organizer_invitation(text) to authenticated;
 grant execute on function public.phase4_revoke_organizer_assignment(uuid, text) to authenticated;
@@ -1918,6 +2026,7 @@ grant execute on function public.phase4_revoke_organizer_invitation(uuid, text) 
 grant execute on function public.phase4_submit_entry(uuid, jsonb) to authenticated;
 grant execute on function public.phase4_review_entry(uuid, text, text) to authenticated;
 grant execute on function public.phase4_verify_payment(uuid, text, text) to authenticated;
+grant execute on function public.phase4_submit_payment_proof(uuid, uuid, text, numeric) to authenticated;
 grant execute on function public.phase4_respond_participant_invitation(text, boolean) to authenticated;
 
 grant execute on function public.phase4_is_admin() to authenticated;

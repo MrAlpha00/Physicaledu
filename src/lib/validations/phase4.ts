@@ -176,10 +176,38 @@ export const invitationSchema = z.object({
   expiresHours: z.number().int().min(1).max(720).default(72),
 });
 
+export const organizerMatchUpdateSchema = z.object({
+  matchId: z.string().uuid(),
+  status: z.enum(["scheduled", "ready", "ongoing", "postponed", "cancelled", "disputed"]),
+  venue: z.string().trim().max(200).nullable().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+});
+
 export const drawSchema = z.object({
   competitionId: z.string().uuid(),
   drawSeed: z.number().int().min(0).optional(),
   manualOrder: z.array(z.string().uuid()).optional(),
   thirdPlace: z.boolean().optional(),
   reason: z.string().trim().max(1000).nullable().optional(),
+});
+
+export const paymentProofSchema = z.object({
+  entryId: z.string().uuid(),
+  proofFileId: z.string().uuid(),
+  transactionReference: z.string().trim().max(120).optional().default(""),
+  claimedAmount: z.number().min(0).nullable().optional(),
+});
+
+export const invitationTokenSchema = z.object({
+  token: z.string().trim().min(20).max(200),
+});
+
+export const participantInvitationTokenSchema = invitationTokenSchema.extend({
+  accept: z.boolean(),
+});
+
+export const memberConfirmationSchema = z.object({
+  memberId: z.string().uuid(),
+  status: z.enum(["pending", "accepted", "declined", "verified"]),
+  note: z.string().trim().max(500).optional().default(""),
 });

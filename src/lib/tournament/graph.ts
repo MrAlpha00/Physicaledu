@@ -1,11 +1,21 @@
+import type { Json } from "@/types/database";
 import type { GeneratedMatch, TournamentPlan } from "./types";
+
+/** Reads a stored draw payload without trusting it as an already validated plan. */
+export function readTournamentPlan(payload: Json): TournamentPlan | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const candidate = payload as Partial<TournamentPlan>;
+  if (!Array.isArray(candidate.matches) || !Array.isArray(candidate.rounds)) return null;
+  if (!Array.isArray(candidate.edges) || !Array.isArray(candidate.groups)) return null;
+  return candidate as TournamentPlan;
+}
 
 export interface GraphValidationResult {
   valid: boolean;
   errors: string[];
 }
 
-export interface CanvasNodeData {
+export type CanvasNodeData = {
   label: string;
   sublabel?: string;
   matchKey?: string;
@@ -17,16 +27,16 @@ export interface CanvasNodeData {
   seed?: number | null;
   paymentStatus?: string | null;
   groupKey?: string | null;
-}
+};
 
-export interface CanvasNode {
+export type CanvasNode = {
   id: string;
   type: "matchNode" | "participantNode" | "roundNode";
   position: { x: number; y: number };
   data: CanvasNodeData;
-}
+};
 
-export interface CanvasEdge {
+export type CanvasEdge = {
   id: string;
   source: string;
   target: string;
@@ -34,7 +44,7 @@ export interface CanvasEdge {
   animated?: boolean;
   label?: string;
   style?: Record<string, string | number>;
-}
+};
 
 /**
  * Validates the authoritative tournament graph before it is persisted or
@@ -128,6 +138,24 @@ export interface FlowBuildOptions {
   positions?: Record<string, { x: number; y: number }>;
   /** Hide entrant details in public/organiser views. */
   compact?: boolean;
+  /** Live database state overlays the generated plan; the database stays authoritative. */
+  matches?: Array<{
+    matchNumber: number;
+    status: string;
+    winnerEntryId?: string | null;
+    isBye?: boolean;
+    venue?: string | null;
+    startsAt?: string | null;
+  }>;
+  entries?: Array<{ id: string; label: string }>;
+}
+
+/** Adds authoritative database status and human labels to a generated plan. */
+export function buildFlowGraphFromDatabase(
+  plan: TournamentPlan,
+  options: FlowBuildOptions,
+): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
+  return buildFlowGraph(plan, options);
 }
 
 /** Converts validated tournament data into VARSITY canvas nodes and edges. */
@@ -150,22 +178,31 @@ export function buildFlowGraph(
   });
 
   const participantPositions = new Map<string, { x: number; y: number }>();
+  const entryLabel = (entryId: string | null) => {
+    if (!entryId) return "TBD";
+    return options.entries?.find((entry) => entry.id === entryId)?.label ?? entryId;
+  };
+
   plan.matches.forEach((match) => {
     const round = plan.rounds.find((item) => item.key === match.roundKey);
     const column = (round?.roundNumber ?? 1) - 1;
     const baseY = (match.matchNumber - 1) * 190;
+    const live = options.matches?.find((item) => item.matchNumber === match.matchNumber);
+    const competitors = [entryLabel(match.slotA.entryId), entryLabel(match.slotB.entryId)];
     nodes.push({
       id: `match:${match.key}`,
       type: "matchNode",
       position: positionFor(`match:${match.key}`, { x: column * 430 + 160, y: baseY }),
       data: {
         label: match.isBye ? `M${match.matchNumber} · BYE` : `M${match.matchNumber}`,
-        sublabel: match.venue ?? match.roundName,
+        sublabel: options.compact
+          ? (live?.venue ?? match.roundName)
+          : `${competitors[0]} vs ${competitors[1]}`,
         matchKey: match.key,
         roundKey: match.roundKey,
-        status: "scheduled",
-        winnerEntryId: match.byeWinnerEntryId,
-        isBye: match.isBye,
+        status: live?.status ?? "scheduled",
+        winnerEntryId: live ? live.winnerEntryId : match.byeWinnerEntryId,
+        isBye: live?.isBye ?? match.isBye,
         groupKey: match.groupKey,
       },
     });
@@ -182,7 +219,7 @@ export function buildFlowGraph(
         type: "participantNode",
         position,
         data: {
-          label: slot.fromBye ? `${slot.entryId} (BYE)` : slot.entryId,
+          label: slot.fromBye ? `${entryLabel(slot.entryId)} (BYE)` : entryLabel(slot.entryId),
           sublabel: slot.fromBye ? "Advanced by bye" : "Qualified competitor",
           entryId: slot.entryId,
           isBye: slot.fromBye,

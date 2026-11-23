@@ -204,6 +204,22 @@ export async function getActiveDraw(competitionId: string): Promise<Phase4DrawRo
   return data ?? null;
 }
 
+export async function getCanvasPositions(drawId: string): Promise<Record<string, { x: number; y: number }>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("tournament_node_positions").select("node_key,position").eq("draw_id", drawId);
+  const positions: Record<string, { x: number; y: number }> = {};
+  for (const row of data ?? []) {
+    const value = row.position;
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    const point = value as { x?: unknown; y?: unknown };
+    if (typeof point.x === "number" && typeof point.y === "number") {
+      positions[row.node_key] = { x: point.x, y: point.y };
+    }
+  }
+  return positions;
+}
+
 export async function getDrawHistory(competitionId: string): Promise<Phase4DrawRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -378,4 +394,68 @@ export async function getEventDashboardMetrics(): Promise<EventDashboardMetrics>
     pendingResults: matchRows.filter((match) => match.status === "result_submitted").length,
     completedCompetitions: sportRows.filter((sport) => sport.status === "completed").length,
   };
+}
+
+/** Active directory options for scoped organiser invitations (admin only). */
+export const getPhase4DirectoryOptions = cache(async (): Promise<Array<{
+  id: string;
+  fullName: string;
+  usn: string;
+  semester: number;
+  academicYear: number;
+}>> => {
+  const supabase = await createClient();
+  if (!(await isCurrentUserPeAdmin())) return [];
+  const { data } = await supabase
+    .from("student_directory").select("id,full_name,usn,semester,academic_year")
+    .eq("is_active", true).order("full_name").limit(2000);
+  return (data ?? []).map((student) => ({
+    id: student.id,
+    fullName: student.full_name,
+    usn: student.usn,
+    semester: student.semester,
+    academicYear: student.academic_year,
+  }));
+});
+
+export async function getOrganizerMatchViews(userId: string): Promise<Array<{
+  assignment: Phase4AssignmentRow;
+  sport: Phase4SportRow;
+  event: Phase4EventRow;
+  matches: MatchView[];
+}>> {
+  const assignments = await getOrganizerAssignments(userId);
+  return Promise.all(assignments.map(async (item) => ({
+    ...item,
+    matches: await getMatches(item.sport.id),
+  })));
+}
+
+/** Invitations are shown without token hashes; acceptance requires the private link token. */
+export async function getMyOrganizerInvitations(userId: string): Promise<Array<{
+  invitation: Phase4InvitationRow;
+  sport: Phase4SportRow;
+  event: Phase4EventRow;
+}>> {
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles").select("student_directory_id").eq("id", userId).maybeSingle();
+  if (!profile?.student_directory_id) return [];
+  const { data: invitations } = await supabase
+    .from("organizer_invitations").select("*")
+    .eq("student_directory_id", profile.student_directory_id)
+    .is("accepted_at", null).is("revoked_at", null)
+    .order("expires_at", { ascending: false });
+  if (!invitations?.length) return [];
+  const sportIds = [...new Set(invitations.map((item) => item.competition_id))];
+  const { data: sports } = await supabase.from("event_sports").select("*").in("id", sportIds);
+  const eventIds = [...new Set((sports ?? []).map((sport) => sport.event_id))];
+  const { data: events } = eventIds.length
+    ? await supabase.from("sports_events").select("*").in("id", eventIds)
+    : { data: [] };
+  return invitations.flatMap((invitation) => {
+    const sport = (sports ?? []).find((item) => item.id === invitation.competition_id);
+    const event = sport ? (events ?? []).find((item) => item.id === sport.event_id) : null;
+    return sport && event ? [{ invitation, sport, event }] : [];
+  });
 }

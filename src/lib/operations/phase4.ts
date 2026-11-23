@@ -104,6 +104,27 @@ export async function syncMatchToCalendar(
   return calendarEventId;
 }
 
+/** Records suggested achievements once a final has a confirmed winner. Idempotent by source reference. */
+export async function recordFinalWinnerAchievements(matchId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: match } = await supabase
+    .from("tournament_matches").select("draw_id,winner_entry_id,round_name,status")
+    .eq("id", matchId).maybeSingle();
+  if (!match?.winner_entry_id || match.round_name !== "Final" || match.status !== "completed") return 0;
+  const { data: draw } = await supabase
+    .from("tournament_draws").select("competition_id").eq("id", match.draw_id).maybeSingle();
+  if (!draw) return 0;
+  const { data: sport } = await supabase
+    .from("event_sports").select("*").eq("id", draw.competition_id).maybeSingle();
+  if (!sport) return 0;
+  const [{ data: entry }, { data: event }] = await Promise.all([
+    supabase.from("competition_entries").select("*").eq("id", match.winner_entry_id).maybeSingle(),
+    supabase.from("sports_events").select("*").eq("id", sport.event_id).maybeSingle(),
+  ]);
+  if (!entry || !event) return 0;
+  return recordWinnerAchievements(entry, event, sport, matchId);
+}
+
 /** Confirmed final results can suggest verified achievements for the sports profile. */
 export async function recordWinnerAchievements(
   entry: Phase4EntryRow,
@@ -122,6 +143,9 @@ export async function recordWinnerAchievements(
   const reference = `phase4:${event.id}:${sport.id}:${matchId}:${entry.id}`;
   let created = 0;
   for (const member of members) {
+    const { data: existing } = await supabase
+      .from("sports_achievements").select("id").eq("source_reference", reference).maybeSingle();
+    if (existing) continue;
     const { error } = await supabase.from("sports_achievements").insert({
       student_directory_id: member.student_directory_id,
       title: `${sport.name} winner — ${label}`,

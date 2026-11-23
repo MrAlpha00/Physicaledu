@@ -2026,6 +2026,10 @@ export interface Database {
         Args: { p_match_id: string; p_data: Json; p_reason?: string | null };
         Returns: undefined;
       };
+      phase4_organizer_update_match: {
+        Args: { p_match_id: string; p_data: Json };
+        Returns: undefined;
+      };
       phase4_create_organizer_invitation: {
         Args: { p_competition_id: string; p_student_directory_id: string; p_expires_hours?: number };
         Returns: Json;
@@ -2046,6 +2050,15 @@ export interface Database {
       };
       phase4_verify_payment: {
         Args: { p_payment_id: string; p_status: string; p_note?: string | null };
+        Returns: Json;
+      };
+      phase4_submit_payment_proof: {
+        Args: {
+          p_entry_id: string;
+          p_proof_file_id: string;
+          p_transaction_reference?: string | null;
+          p_claimed_amount?: number | null;
+        };
         Returns: Json;
       };
       phase4_respond_participant_invitation: {

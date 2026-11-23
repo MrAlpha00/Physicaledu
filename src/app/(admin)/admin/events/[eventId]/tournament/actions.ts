@@ -6,7 +6,7 @@ import { requirePeAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { generateManualKnockout, generateTournament } from "@/lib/tournament/engine";
 import { validateTournamentGraph } from "@/lib/tournament/graph";
-import { recordWinnerAchievements, syncMatchToCalendar } from "@/lib/operations/phase4";
+import { recordFinalWinnerAchievements, syncMatchToCalendar } from "@/lib/operations/phase4";
 import { drawSchema, matchScheduleSchema, resultSchema } from "@/lib/validations/phase4";
 import type { PointsConfig, TournamentPlan } from "@/lib/tournament/types";
 import type { Json } from "@/types/database";
@@ -232,26 +232,7 @@ export async function correctResultAction(
     p_reason: reason,
   });
   if (error) return { status: "error", message: error.message };
-  await maybeRecordFinalAchievement(matchId);
+  await recordFinalWinnerAchievements(matchId);
   refresh(eventId, sportId);
   return { status: "success", message: "Result corrected and advancement updated." };
-}
-
-async function maybeRecordFinalAchievement(matchId: string): Promise<void> {
-  const supabase = await createClient();
-  const { data: match } = await supabase.from("tournament_matches").select("*").eq("id", matchId).maybeSingle();
-  if (!match?.winner_entry_id || match.round_name !== "Final") return;
-  const { data: draw } = await supabase
-    .from("tournament_draws").select("competition_id").eq("id", match.draw_id).maybeSingle();
-  if (!draw) return;
-  const { data: sport } = await supabase
-    .from("event_sports").select("*").eq("id", draw.competition_id).maybeSingle();
-  if (!sport) return;
-  const [{ data: entry }, { data: event }] = await Promise.all([
-    supabase.from("competition_entries").select("*").eq("id", match.winner_entry_id).maybeSingle(),
-    supabase.from("sports_events").select("*").eq("id", sport.event_id).maybeSingle(),
-  ]);
-  if (entry && event) {
-    await recordWinnerAchievements(entry, event, sport, matchId);
-  }
 }
