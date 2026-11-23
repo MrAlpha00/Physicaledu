@@ -3,6 +3,7 @@
 import { guestSetupSchema } from "@/lib/validations/phase5";
 import { gameConfigFor, isGameSlug } from "@/lib/games/catalog";
 import type { GameSlug, GameConfig } from "@/lib/games/types";
+import type { Json } from "@/types/database";
 
 const GUEST_PREFIXES = [
   "Rally", "Cobalt", "Chalk", "Sprint", "Navy", "Lime", "Pivot", "Ace",
@@ -21,7 +22,7 @@ export async function prepareGuestMatchAction(raw: unknown): Promise<{
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid guest setup." };
   }
-  const config = gameConfigFor(parsed.data.gameSlug, parsed.data.config);
+  const config = gameConfigFor(parsed.data.gameSlug, parsed.data.config as Record<string, Json>);
   return {
     ok: true,
     names: [parsed.data.playerOne, parsed.data.playerTwo],
