@@ -58,6 +58,15 @@ Configure the Resend webhook in the Resend dashboard to point at
 [PHASE_3_EMAIL.md](PHASE_3_EMAIL.md) and
 [PHASE_3_DEPLOYMENT.md](PHASE_3_DEPLOYMENT.md).
 
+## Phase 4 (no new variables)
+
+Phase 4 event banners, logos, sport images, payment QR images and private
+payment proofs reuse the existing private R2 bucket and the same server-only
+`R2_*` credentials. Draws, registrations and results use Supabase SSR/RLS;
+notifications and calendar sync reuse the Phase 3 tables and functions. There
+is no new secret and no `NEXT_PUBLIC_*` value for Phase 4. See
+[PHASE_4_DEPLOYMENT.md](PHASE_4_DEPLOYMENT.md) for the migration and R2 checklist.
+
 ## Missing variables
 
 The app reports missing variables by **name only** (for example,

@@ -220,3 +220,70 @@ Module guides: [PHASE_3.md](PHASE_3.md),
 [PHASE_3_EMAIL.md](PHASE_3_EMAIL.md),
 [PHASE_3_SPORTS_PROFILES.md](PHASE_3_SPORTS_PROFILES.md) and
 [PHASE_3_REPORTS.md](PHASE_3_REPORTS.md).
+
+## Applying the Phase 4 migration
+
+After `0001`–`0003` are in place, run
+`supabase/migrations/0004_phase4_events_tournaments.sql` **once** in the SQL
+Editor. It is additive only and does not modify Phase 1–3 records. It was
+prepared locally, never applied remotely and never used with a database reset.
+See [PHASE_4_DEPLOYMENT.md](PHASE_4_DEPLOYMENT.md).
+
+### Phase 4 tables
+
+| Group | Tables |
+| --- | --- |
+| Files | `phase4_files` |
+| Events | `sports_events`, `event_sports` |
+| Rules | `competition_rules`, `competition_eligibility_rules` |
+| Entries | `competition_entries`, `competition_entry_members`, `registration_history`, `participant_invitations` |
+| Payments | `competition_payment_settings`, `competition_payment_records`, `payment_verification_history` |
+| Tournaments | `tournament_draws`, `tournament_stages`, `tournament_groups`, `tournament_participants`, `tournament_matches`, `tournament_match_slots`, `tournament_match_results`, `tournament_match_result_history`, `tournament_standings`, `tournament_graph_edges`, `tournament_node_positions` |
+| Organisers | `sport_organizer_assignments`, `organizer_invitations`, `organizer_activity_logs` |
+| Integration | `phase4_calendar_links` |
+
+All 27 tables have RLS enabled. Public reads are limited to published public
+events/sports, validated tournament structures and completed public results.
+Payment records, proof files, rosters, contact details and weights remain
+private. Realtime is added for `tournament_matches` and `competition_entries`.
+
+### Important Phase 4 functions
+
+- Access: `phase4_is_admin`, `phase4_has_sport_access`, `phase4_event_is_public`,
+  `phase4_competition_is_public`, `phase4_owns_entry`,
+  `phase4_can_view_competition`, `phase4_can_view_file`.
+- Draw/canvas: `phase4_validate_plan`, `phase4_save_draw`,
+  `phase4_save_node_positions`, `phase4_set_draw_lock`.
+- Results: `phase4_submit_match_result`, `phase4_correct_match_result`,
+  `phase4_admin_update_match`, `phase4_organizer_update_match`.
+- Registration/payment: `phase4_submit_entry`, `phase4_review_entry`,
+  `phase4_submit_payment_proof`, `phase4_verify_payment`,
+  `phase4_respond_participant_invitation`.
+- Organisers: `phase4_create_organizer_invitation`,
+  `phase4_accept_organizer_invitation`, `phase4_revoke_organizer_assignment`,
+  `phase4_revoke_organizer_invitation`.
+- Files: `phase4_authorize_upload`, `phase4_confirm_upload`,
+  `phase4_authorize_download`.
+- Integration: `phase4_notify_users` (delegates to `phase3_notify_user`).
+
+`phase4_save_draw` validates the plan again inside PostgreSQL and archives the
+previous draw before writing the new version in one transaction. Organiser RPCs
+check active per-sport assignments and never grant a global role. File RPCs
+authorize short-lived R2 URLs and re-check visibility on every download.
+
+### Phase 4 RLS summary
+
+| Data | Public | Participant | Sport organiser | PE Admin |
+| --- | --- | --- | --- | --- |
+| Events/sports | Published public only | Published public + own entry context | Assigned sport read | All |
+| Entries/rosters | None | Own entry only | Assigned sport entries; no payments | All |
+| Payment proofs/records | None | Own record/proof via signed URL | **None** | All |
+| Draw/canvas | Published public read-only | Published public read-only | Assigned sport read | Generate, move nodes, lock, regenerate |
+| Results/standings | Completed public results | Published results | Assigned sport read and submit | All, including corrections |
+| Organiser invitations/assignments | None | Own invitation | Own assignment/invitation | Create/revoke |
+
+Module guides: [PHASE_4.md](PHASE_4.md),
+[PHASE_4_EVENTS.md](PHASE_4_EVENTS.md),
+[PHASE_4_TOURNAMENTS.md](PHASE_4_TOURNAMENTS.md),
+[PHASE_4_ORGANIZERS.md](PHASE_4_ORGANIZERS.md) and
+[PHASE_4_DEPLOYMENT.md](PHASE_4_DEPLOYMENT.md).
