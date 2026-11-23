@@ -181,6 +181,22 @@ create index game_matches_challenge_idx on public.game_matches (challenge_id);
 create trigger game_matches_set_updated_at before update on public.game_matches
   for each row execute function public.set_updated_at();
 
+create table public.game_rating_history (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  game_slug text not null references public.game_catalog (slug) on delete cascade,
+  match_id uuid references public.game_matches (id) on delete set null,
+  season_key text not null default 'all-time',
+  before_rating integer not null,
+  after_rating integer not null,
+  delta integer not null,
+  outcome text not null check (outcome in ('win', 'loss', 'draw')),
+  reason text not null default 'ranked_match',
+  created_at timestamptz not null default now(),
+  constraint game_rating_history_unique_match unique (match_id, user_id, game_slug)
+);
+create index game_rating_history_user_idx on public.game_rating_history (user_id, created_at desc);
+
 create table public.game_match_players (
   match_id uuid not null references public.game_matches (id) on delete cascade,
   player_index integer not null check (player_index in (0, 1)),
@@ -483,7 +499,7 @@ create policy phase5_results_admin_all on public.game_match_results for all to a
   using (public.phase5_is_admin()) with check (public.phase5_is_admin());
 
 create policy phase5_guest_sessions_insert on public.guest_game_sessions for insert to anon, authenticated
-  with check (expires_at > now() and anonymous_id = current_setting('request.jwt.claim.sub', true));
+  with check (expires_at > now() and length(anonymous_id) between 16 and 128);
 create policy phase5_guest_sessions_admin_all on public.guest_game_sessions for all to authenticated
   using (public.phase5_is_admin()) with check (public.phase5_is_admin());
 
@@ -933,8 +949,8 @@ declare
   v_match public.game_matches;
   v_player public.game_match_players;
   v_new_version integer;
-  v_result_id uuid;
-  v_settings record;
+  v_k_factor integer := 32;
+  v_start integer := 1200;
   v_rating_a integer; v_rating_b integer;
   v_expected_a double precision; v_expected_b double precision;
   v_score_a double precision; v_score_b double precision;
@@ -992,31 +1008,34 @@ begin
     values (v_match.id, v_match.game_slug, v_match.mode, v_winner, p_outcome, false)
     on conflict (match_id) do nothing;
 
-    select * into v_settings from public.game_settings where game_slug = v_match.game_slug;
-    select season_key into v_season from public.game_settings where game_slug = v_match.game_slug;
+    select k_factor, starting_rating, season_key into v_k_factor, v_start, v_season
+    from public.game_settings where game_slug = v_match.game_slug;
+    v_k_factor := coalesce(v_k_factor, 32);
+    v_start := coalesce(v_start, 1200);
+    v_season := coalesce(v_season, 'all-time');
 
     if v_match.mode = 'ranked'
        and coalesce(v_kind, '') in ('win', 'draw')
        and not exists (select 1 from public.match_disputes where match_id = v_match.id and status in ('open', 'reviewing'))
        and not exists (select 1 from public.game_rating_history where match_id = v_match.id)
        and not public.phase5_is_restricted(v_player.user_id, 'ranked', v_match.game_slug) then
-      select user_id, rating into v_user_a, v_rating_a from public.game_match_players
+      select user_id into v_user_a from public.game_match_players
         where match_id = v_match.id and player_index = 0;
-      select user_id, rating into v_user_b, v_rating_b from public.game_match_players
+      select user_id into v_user_b from public.game_match_players
         where match_id = v_match.id and player_index = 1;
       select r.rating into v_rating_a from public.game_ratings r
-        where r.user_id = v_user_a and r.game_slug = v_match.game_slug and r.season_key = coalesce(v_season, 'all-time');
+        where r.user_id = v_user_a and r.game_slug = v_match.game_slug and r.season_key = v_season;
       select r.rating into v_rating_b from public.game_ratings r
-        where r.user_id = v_user_b and r.game_slug = v_match.game_slug and r.season_key = coalesce(v_season, 'all-time');
-      v_rating_a := coalesce(v_rating_a, coalesce(v_settings.starting_rating, 1200));
-      v_rating_b := coalesce(v_rating_b, coalesce(v_settings.starting_rating, 1200));
+        where r.user_id = v_user_b and r.game_slug = v_match.game_slug and r.season_key = v_season;
+      v_rating_a := coalesce(v_rating_a, v_start);
+      v_rating_b := coalesce(v_rating_b, v_start);
 
       v_expected_a := 1.0 / (1.0 + power(10.0::double precision, (v_rating_b - v_rating_a)::double precision / 400.0));
       v_expected_b := 1.0 - v_expected_a;
       v_score_a := case when v_kind = 'draw' then 0.5 when v_winner = 0 then 1.0 else 0.0 end;
       v_score_b := case when v_kind = 'draw' then 0.5 when v_winner = 1 then 1.0 else 0.0 end;
-      v_delta_a := round((coalesce(v_settings.k_factor, 32))::double precision * (v_score_a - v_expected_a))::integer;
-      v_delta_b := round((coalesce(v_settings.k_factor, 32))::double precision * (v_score_b - v_expected_b))::integer;
+      v_delta_a := round(v_k_factor::double precision * (v_score_a - v_expected_a))::integer;
+      v_delta_b := round(v_k_factor::double precision * (v_score_b - v_expected_b))::integer;
 
       insert into public.game_rating_history
         (user_id, game_slug, match_id, season_key, before_rating, after_rating, delta, outcome)
