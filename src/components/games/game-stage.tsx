@@ -182,11 +182,7 @@ export function GameStage({
   }, [matchPublicId, router, status]);
 
   useEffect(() => {
-    if (!matchPublicId || status !== "countdown") {
-      setCountdown(null);
-      return;
-    }
-    setCountdown(3);
+    if (!matchPublicId || status !== "countdown") return;
     const timer = window.setInterval(() => {
       setCountdown((value) => {
         if (value === null) return null;
