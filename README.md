@@ -73,10 +73,12 @@ by the provider is tracked separately.
 
 3. Apply the database migrations in order: `0001_phase1_foundation.sql`, then
    `0002_phase2_daily_operations.sql`, then the additive
-   `0003_phase3_department_management.sql`. Apply `0003` once manually after the
-   first two; it was not applied remotely during this work. See
-   [docs/DATABASE.md](docs/DATABASE.md). Never reset a remote database with real
-   records.
+   `0003_phase3_department_management.sql`, then the additive
+   `0004_phase4_events_tournaments.sql`. Apply `0003` and `0004` once manually
+   after their predecessors; neither was applied remotely during this work. See
+   [docs/DATABASE.md](docs/DATABASE.md) and
+   [docs/PHASE_4_DEPLOYMENT.md](docs/PHASE_4_DEPLOYMENT.md). Never reset a remote
+   database with real records.
 
 4. Create the first PE administrator: see
    [docs/ADMIN_BOOTSTRAP.md](docs/ADMIN_BOOTSTRAP.md).
