@@ -102,6 +102,7 @@ export interface MatchEnvelope {
   slug: GameSlug;
   mode: MatchMode;
   status: "waiting" | "countdown" | "active" | "completed" | "cancelled" | "abandoned" | "disputed";
+  version: number;
   config: Record<string, Json>;
   players: MatchPlayer[];
   state: Json;

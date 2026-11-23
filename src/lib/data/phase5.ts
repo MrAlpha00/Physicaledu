@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { GAME_DEFINITIONS, GAME_LIST, type GameDefinition } from "@/lib/games/catalog";
-import { isGameSlug, type GameSlug } from "@/lib/games/types";
+import { GAME_DEFINITIONS, GAME_LIST, isGameSlug, type GameDefinition } from "@/lib/games/catalog";
+import type { GameSlug } from "@/lib/games/types";
 import type {
   Phase5ActionRow,
   Phase5ChallengeRow,
@@ -108,7 +108,7 @@ export const getLeaderboard = cache(async (
   const supabase = await createClient();
   let query = supabase
     .from("game_ratings")
-    .select("user_id, gaming_name, rating, highest_rating, played, wins, losses, draws, season_key")
+    .select("user_id, rating, highest_rating, played, wins, losses, draws, season_key")
     .eq("game_slug", slug)
     .order("rating", { ascending: false })
     .order("played", { ascending: false })

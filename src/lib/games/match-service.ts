@@ -43,6 +43,7 @@ export function createMatchEnvelope(input: {
     slug: input.slug,
     mode: input.mode,
     status: "waiting",
+    version: 1,
     config,
     players,
     state: engine.toJson(engine.create(config)),
@@ -122,6 +123,7 @@ export function applyAuthoritativeAction(
 
   const updated: MatchEnvelope = {
     ...match,
+    version: result.state.version,
     state: engine.toJson(result.state),
     status: result.state.status === "completed" ? "completed" : match.status,
     updatedAt: now.toISOString(),

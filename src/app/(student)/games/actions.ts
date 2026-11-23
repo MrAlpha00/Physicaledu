@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/session";
+import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMatchByPublicId } from "@/lib/data/phase5";
@@ -46,6 +46,7 @@ function toEnvelope(view: NonNullable<Awaited<ReturnType<typeof getMatchByPublic
     slug: view.game_slug as GameSlug,
     mode: view.mode as MatchMode,
     status: view.status,
+    version: view.version,
     config: jsonRecord(view.config),
     players: [...view.players]
       .sort((a, b) => a.player_index - b.player_index)
@@ -113,7 +114,14 @@ export async function searchOpponentsAction(query: string): Promise<{ ok: boolea
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("phase5_search_profiles", { p_query: parsed.data.query });
   if (error) return { ok: false, results: [], message: error.message };
-  return { ok: true, results: (data ?? []).map((row) => ({ ...row })) };
+  return {
+    ok: true,
+    results: (data ?? []).map((row) => ({
+      userId: row.user_id,
+      gamingName: row.gaming_name,
+      departmentName: row.department_name,
+    })),
+  };
 }
 
 export async function createChallengeAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
