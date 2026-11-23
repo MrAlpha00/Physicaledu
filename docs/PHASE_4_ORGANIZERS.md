@@ -5,7 +5,7 @@ created and no broad RLS policy is opened for them.
 
 ## Invitation flow
 
-1. PE Admin opens `/admin/events/[eventId]/sport/[sportId]/organisers` and
+1. PE Admin opens `/admin/events/[eventId]/sports/[sportId]/organizers` and
    selects an active record from `student_directory`.
 2. `phase4_create_organizer_invitation(competitionId, directoryId, expiresHours)`
    generates a high-entropy token, stores only its SHA-256 hash, enforces a

@@ -34,7 +34,7 @@ Lucide, Tailwind, R2 presigning, Phase 3 notifications/calendar/profile helpers)
 | Route | Audience | Purpose |
 | --- | --- | --- |
 | `/admin/events`, `/admin/events/new`, `/admin/events/dashboard` | PE Admin | Event list, creation and live operations dashboard |
-| `/admin/events/[eventId]` and nested `/sport/[sportId]/...` | PE Admin | Event/sport config, rules, payments, registrations, payments, organisers, draw, matches and results |
+| `/admin/events/[eventId]` and nested `/sports/[sportId]/...` | PE Admin | Event/sport config, rules, registrations, payments, organisers, draw, matches and results |
 | `/events`, `/events/[slug]`, `/events/[slug]/[sportSlug]` | Public | Published events, sport rules, brackets and results |
 | `/register` | Public/student | Event entry and payment-proof submission links |
 | `/results` | Public | Published results index |

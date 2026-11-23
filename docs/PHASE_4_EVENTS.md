@@ -8,7 +8,7 @@ live match management are documented in [PHASE_4_TOURNAMENTS.md](PHASE_4_TOURNAM
 A PE Admin creates an event at `/admin/events/new` with a name, unique slug,
 academic year, dates, venue, instructions, contact information and publication
 status. An event can contain any number of sports; there is no fixed sport list
-and no hard-coded per-sport code. Each sport (`/admin/events/[eventId]/sport/[sportId]`)
+and no hard-coded per-sport code. Each sport (`/admin/events/[eventId]/sports/[sportId]`)
 defines:
 
 - `team` or `individual` participation mode;
@@ -26,7 +26,7 @@ their parent is published; `phase4_can_view_file()` enforces that at read time.
 
 ## Registration rules and eligibility
 
-`/admin/events/[eventId]/sport/[sportId]/registrations` edits `competition_rules`
+`/admin/events/[eventId]/sports/[sportId]/registrations` edits `competition_rules`
 and `competition_eligibility_rules`. Rules include team name requirement, min/max
 team size, team limit, captain requirement, substitute allowance, duplicate
 player across teams, multiple competition entries, member confirmation, manual
