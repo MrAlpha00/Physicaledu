@@ -843,7 +843,16 @@ create policy phase4_calendar_links_read on public.phase4_calendar_links for sel
 /* Grants — RLS remains the final authority                                   */
 /* ------------------------------------------------------------------------- */
 
-grant select on all tables in schema public to anon;
+grant select on
+  public.phase4_files, public.sports_events, public.event_sports,
+  public.competition_rules, public.competition_eligibility_rules,
+  public.competition_payment_settings, public.tournament_draws,
+  public.tournament_stages, public.tournament_groups,
+  public.tournament_participants, public.tournament_matches,
+  public.tournament_match_slots, public.tournament_match_results,
+  public.tournament_standings, public.tournament_graph_edges,
+  public.tournament_node_positions
+  to anon;
 grant select, insert, update, delete on
   public.phase4_files, public.sports_events, public.event_sports,
   public.competition_rules, public.competition_eligibility_rules,
@@ -1754,7 +1763,176 @@ begin
 end;
 $$;
 
--- __PHASE4_PART7__
+create or replace function public.phase4_review_entry(
+  p_entry_id uuid, p_status text, p_note text default null
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_entry public.competition_entries%rowtype;
+  v_competition public.event_sports%rowtype;
+  v_status text;
+  v_users uuid[];
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  if p_status not in ('under_review', 'approved', 'rejected', 'waitlisted', 'withdrawn', 'submitted') then
+    raise exception 'Unsupported registration status';
+  end if;
+  select * into v_entry from public.competition_entries where id = p_entry_id for update;
+  if not found then raise exception 'Registration not found'; end if;
+  select * into v_competition from public.event_sports where id = v_entry.competition_id;
+  v_status := p_status;
+
+  if v_status = 'approved' and v_competition.max_entries is not null then
+    if (select count(*) from public.competition_entries
+        where competition_id = v_entry.competition_id and status = 'approved') >= v_competition.max_entries
+       and v_entry.status <> 'approved' then
+      v_status := 'waitlisted';
+    end if;
+  end if;
+
+  update public.competition_entries
+  set status = v_status,
+      reviewed_at = now(), reviewed_by = auth.uid(),
+      rejection_reason = case when v_status = 'rejected' then p_note else rejection_reason end,
+      correction_note = case when v_status = 'submitted' then p_note else correction_note end,
+      updated_at = now()
+  where id = p_entry_id;
+
+  insert into public.registration_history (entry_id, actor_id, action, from_status, to_status, details)
+  values (p_entry_id, auth.uid(), 'reviewed', v_entry.status, v_status,
+    jsonb_build_object('note', p_note));
+
+  v_users := array_remove(array[v_entry.captain_user_id], null);
+  perform public.phase4_notify_users(
+    v_users, 'Registration ' || v_status,
+    'Your entry for ' || v_competition.name || ' is now ' || replace(v_status, '_', ' ') || '.',
+    'future_event', '/my-events');
+
+  perform public.phase3_log('registration_reviewed', 'competition_entries', p_entry_id::text,
+    jsonb_build_object('from', v_entry.status, 'to', v_status, 'note', p_note));
+  return jsonb_build_object('entryId', p_entry_id, 'status', v_status);
+end;
+$$;
+
+create or replace function public.phase4_verify_payment(
+  p_payment_id uuid, p_status text, p_note text default null
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_payment public.competition_payment_records%rowtype;
+  v_entry public.competition_entries%rowtype;
+  v_competition public.event_sports%rowtype;
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  if p_status not in ('verified', 'rejected', 'waived', 'refunded', 'pending_verification', 'not_required') then
+    raise exception 'Unsupported payment status';
+  end if;
+  select * into v_payment from public.competition_payment_records where id = p_payment_id for update;
+  if not found then raise exception 'Payment record not found'; end if;
+  select * into v_entry from public.competition_entries where id = v_payment.entry_id;
+  select * into v_competition from public.event_sports where id = v_entry.competition_id;
+
+  update public.competition_payment_records
+  set status = p_status, note = coalesce(p_note, note),
+      verified_by = auth.uid(),
+      verified_at = case when p_status in ('verified', 'rejected', 'waived', 'refunded')
+        then now() else null end,
+      updated_at = now()
+  where id = p_payment_id;
+
+  update public.competition_entries
+  set payment_status = p_status, updated_at = now() where id = v_payment.entry_id;
+
+  insert into public.payment_verification_history (payment_id, actor_id, action, from_status, to_status, note)
+  values (p_payment_id, auth.uid(), 'verified', v_payment.status, p_status, p_note);
+
+  perform public.phase4_notify_users(
+    array_remove(array[v_entry.captain_user_id], null),
+    'Payment ' || p_status,
+    'Payment for ' || v_competition.name || ' is now ' || replace(p_status, '_', ' ') || '.',
+    'future_event', '/my-events');
+
+  perform public.phase3_log('payment_verified', 'competition_payment_records', p_payment_id::text,
+    jsonb_build_object('from', v_payment.status, 'to', p_status, 'note', p_note));
+  return jsonb_build_object('paymentId', p_payment_id, 'status', p_status);
+end;
+$$;
+
+create or replace function public.phase4_respond_participant_invitation(
+  p_token text, p_accept boolean
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_invitation public.participant_invitations%rowtype;
+  v_entry public.competition_entries%rowtype;
+begin
+  select * into v_invitation from public.participant_invitations
+  where token_hash = encode(digest(p_token, 'sha256'), 'hex') for update;
+  if not found or v_invitation.accepted_at is not null or v_invitation.revoked_at is not null
+     or v_invitation.expires_at <= now() then
+    raise exception 'This participation request is invalid or expired.';
+  end if;
+  if not exists (
+    select 1 from public.competition_entry_members m
+    where m.id = v_invitation.member_id and m.user_id = auth.uid()) then
+    raise exception 'This participation request belongs to another student.';
+  end if;
+  update public.participant_invitations set accepted_at = now() where id = v_invitation.id;
+  update public.competition_entry_members
+  set confirmation_status = case when p_accept then 'accepted' else 'declined' end,
+      confirmed_at = now()
+  where id = v_invitation.member_id;
+  select * into v_entry from public.competition_entries where id = v_invitation.entry_id;
+  return jsonb_build_object('entryId', v_entry.id, 'accepted', p_accept);
+end;
+$$;
+
+/* ------------------------------------------------------------------------- */
+/* RPC grants                                                                 */
+/* ------------------------------------------------------------------------- */
+
+revoke all on function public.phase4_validate_plan(jsonb) from public;
+revoke all on function public.phase4_save_draw(uuid, jsonb, text) from public;
+revoke all on function public.phase4_save_node_positions(uuid, jsonb) from public;
+revoke all on function public.phase4_set_draw_lock(uuid, boolean, text) from public;
+revoke all on function public.phase4_submit_match_result(uuid, jsonb, boolean) from public;
+revoke all on function public.phase4_correct_match_result(uuid, jsonb, text) from public;
+revoke all on function public.phase4_admin_update_match(uuid, jsonb, text) from public;
+revoke all on function public.phase4_create_organizer_invitation(uuid, uuid, integer) from public;
+revoke all on function public.phase4_accept_organizer_invitation(text) from public;
+revoke all on function public.phase4_revoke_organizer_assignment(uuid, text) from public;
+revoke all on function public.phase4_revoke_organizer_invitation(uuid, text) from public;
+revoke all on function public.phase4_submit_entry(uuid, jsonb) from public;
+revoke all on function public.phase4_review_entry(uuid, text, text) from public;
+revoke all on function public.phase4_verify_payment(uuid, text, text) from public;
+revoke all on function public.phase4_respond_participant_invitation(text, boolean) from public;
+
+grant execute on function public.phase4_validate_plan(jsonb) to authenticated;
+grant execute on function public.phase4_save_draw(uuid, jsonb, text) to authenticated;
+grant execute on function public.phase4_save_node_positions(uuid, jsonb) to authenticated;
+grant execute on function public.phase4_set_draw_lock(uuid, boolean, text) to authenticated;
+grant execute on function public.phase4_submit_match_result(uuid, jsonb, boolean) to authenticated;
+grant execute on function public.phase4_correct_match_result(uuid, jsonb, text) to authenticated;
+grant execute on function public.phase4_admin_update_match(uuid, jsonb, text) to authenticated;
+grant execute on function public.phase4_create_organizer_invitation(uuid, uuid, integer) to authenticated;
+grant execute on function public.phase4_accept_organizer_invitation(text) to authenticated;
+grant execute on function public.phase4_revoke_organizer_assignment(uuid, text) to authenticated;
+grant execute on function public.phase4_revoke_organizer_invitation(uuid, text) to authenticated;
+grant execute on function public.phase4_submit_entry(uuid, jsonb) to authenticated;
+grant execute on function public.phase4_review_entry(uuid, text, text) to authenticated;
+grant execute on function public.phase4_verify_payment(uuid, text, text) to authenticated;
+grant execute on function public.phase4_respond_participant_invitation(text, boolean) to authenticated;
+
+grant execute on function public.phase4_is_admin() to authenticated;
+grant execute on function public.phase4_has_sport_access(uuid, uuid) to authenticated;
+grant execute on function public.phase4_event_is_public(uuid) to anon, authenticated;
+grant execute on function public.phase4_competition_is_public(uuid) to anon, authenticated;
+grant execute on function public.phase4_can_view_file(uuid) to anon, authenticated;
+
+alter publication supabase_realtime add table public.tournament_matches;
+alter publication supabase_realtime add table public.competition_entries;
+
+comment on table public.sports_events is 'Phase 4 event container; RLS scoped to PE Admin, assigned organisers and public visibility.';
+comment on table public.tournament_draws is 'Authoritative tournament generation version; the React Flow canvas is a projection of this data.';
+comment on table public.competition_payment_records is 'Private payment proofs; never exposed to organisers or public pages.';
+
 
 
 
