@@ -21,7 +21,7 @@ import {
 import { Brand } from "@/components/layout/brand";
 import { signOutAction } from "@/app/auth/actions";
 import { VerificationBadge } from "@/components/shared/status-badge";
-import { isPeAdminRole } from "@/lib/permissions/roles";
+import { hasRole, isPeAdminRole, ROLES } from "@/lib/permissions/roles";
 import type { ProfileRow } from "@/types/domain";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +38,7 @@ export function StudentShell({
 }) {
   const pathname = usePathname();
   const isAdmin = isPeAdminRole(profile.roles);
+  const isOrganiser = hasRole(profile.roles, ROLES.eventOrganizer) || isAdmin;
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const links = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -48,14 +49,18 @@ export function StudentShell({
         ]
       : []),
     { href: "/tasks", label: "Tasks", icon: BookOpenCheck },
-    { href: "/my-events", label: "My events", icon: Trophy },
-    { href: "/games/dashboard", label: "Games", icon: Gamepad2 },
-    { href: "/organizer", label: "Organiser", icon: ClipboardList },
+    { href: "/scan", label: "Scan QR", icon: QrCode },
     { href: "/equipment", label: "Equipment", icon: Package },
+    { href: "/my-equipment", label: "My equipment", icon: Package },
     { href: "/calendar", label: "Calendar", icon: CalendarDays },
     { href: "/feedback", label: "Feedback", icon: MessageSquareText },
+    { href: "/my-feedback", label: "My feedback", icon: MessageSquareText },
+    { href: "/notifications", label: "Notifications", icon: Bell },
+    { href: "/games/dashboard", label: "Games", icon: Gamepad2 },
+    { href: "/games/challenges", label: "Challenges", icon: Trophy },
     { href: "/my-sports-profile", label: "My sport", icon: Trophy },
-    { href: "/scan", label: "Scan QR", icon: QrCode },
+    { href: "/my-events", label: "My events", icon: Trophy },
+    ...(isOrganiser ? [{ href: "/organizer", label: "Organiser", icon: ClipboardList }] : []),
     { href: "/profile", label: "Profile", icon: UserRound },
   ];
 
