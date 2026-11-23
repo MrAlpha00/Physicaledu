@@ -43,11 +43,12 @@ export function CompetitionRulesForm({
 
   function submit(formData: FormData) {
     const customQuestionsText = String(formData.get("customQuestions") ?? "").trim();
-    let customQuestions: Json[] = [];
+    let customQuestions: CompetitionRulesInput["customQuestions"] = [];
     try {
-      customQuestions = customQuestionsText ? (JSON.parse(customQuestionsText) as Json[]) : [];
+      const parsed: Json = customQuestionsText ? (JSON.parse(customQuestionsText) as Json) : [];
+      customQuestions = competitionRulesSchema.shape.customQuestions.parse(parsed);
     } catch {
-      setNotice({ status: "error", message: "Custom questions must be valid JSON." });
+      setNotice({ status: "error", message: "Custom questions must be a valid JSON array of question objects." });
       return;
     }
     startTransition(async () => {
