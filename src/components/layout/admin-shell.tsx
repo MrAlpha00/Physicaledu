@@ -57,7 +57,10 @@ const navigation = [
     label: "Department (Phase 3)",
     icon: Wrench,
     children: [
-      { href: "/admin/equipment", label: "Equipment & maintenance" },
+      { href: "/admin/equipment", label: "Equipment overview" },
+      { href: "/admin/equipment/items", label: "Inventory" },
+      { href: "/admin/equipment/transactions", label: "Issue / return" },
+      { href: "/admin/equipment/maintenance", label: "Maintenance" },
       { href: "/admin/calendar", label: "PE calendar" },
       { href: "/admin/feedback", label: "Student feedback" },
       { href: "/admin/game-rules", label: "Game rules CMS" },
@@ -90,7 +93,14 @@ const navigation = [
       { href: "/admin/notifications", label: "Notifications & email" },
     ],
   },
-  { href: "/admin/qr-codes", label: "QR Manager", icon: QrCode },
+  {
+    label: "QR Manager",
+    icon: QrCode,
+    children: [
+      { href: "/admin/qr-codes", label: "QR codes" },
+      { href: "/admin/qr-codes/print", label: "Print poster sheets" },
+    ],
+  },
 ];
 
 export function AdminShell({
