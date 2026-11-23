@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
-import { getSiteUrl } from "@/lib/env/public";
+import { getCanonicalSiteUrl } from "@/lib/env/public";
 
 /** Generated at /manifest.webmanifest. All icons are original VARSITY artwork. */
 export default function manifest(): MetadataRoute.Manifest {
-  const siteUrl = getSiteUrl();
+  const siteUrl = getCanonicalSiteUrl();
   const icon = (name: string, sizes: string, purpose?: "any" | "maskable") => ({
     src: new URL(`/icons/${name}`, siteUrl).toString(),
     sizes,
