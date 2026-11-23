@@ -176,6 +176,86 @@ export function DrawControl({
   );
 }
 
+export function ManualDrawForm({
+  eventId,
+  sportId,
+  entries,
+}: {
+  eventId: string;
+  sportId: string;
+  entries: Array<{ id: string; label: string }>;
+}) {
+  const { notice, pending, run } = useActionFeedback();
+  const [pairings, setPairings] = useState<Array<[string, string]>>([
+    ["", ""],
+  ]);
+
+  function update(index: number, slot: 0 | 1, value: string) {
+    setPairings((current) => current.map((pair, position) =>
+      position === index ? ([slot === 0 ? value : pair[0], slot === 1 ? value : pair[1]] as [string, string]) : pair));
+  }
+
+  return (
+    <form
+      className="space-y-4 border border-navy/10 bg-white p-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        run(() => saveManualPairings({
+          eventId,
+          sportId,
+          pairings: pairings
+            .filter(([a, b]) => a || b)
+            .map(([a, b]) => [a || null, b || null] as [string | null, string | null]),
+          reason: String(data.get("reason") ?? ""),
+        }));
+      }}
+    >
+      <div>
+        <p className="eyebrow">Manual knockout draw</p>
+        <p className="mt-1 text-xs text-ink-muted">Pair approved competitors explicitly. Empty slots become byes where the engine allows them.</p>
+      </div>
+      <Phase4ActionNotice state={notice} />
+      <div className="space-y-2">
+        {pairings.map((pair, index) => (
+          <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            {([0, 1] as const).map((slot) => (
+              <select
+                key={slot}
+                aria-label={`Pair ${index + 1} slot ${slot + 1}`}
+                value={pair[slot]}
+                onChange={(change) => update(index, slot, change.target.value)}
+                className={fieldClass}
+              >
+                <option value="">Bye / TBD</option>
+                {entries.map((entry) => (
+                  <option key={entry.id} value={entry.id}>{entry.label}</option>
+                ))}
+              </select>
+            ))}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setPairings((current) => current.filter((_, position) => position !== index))}
+            >
+              Remove
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={() => setPairings((current) => [...current, ["", ""]])}>
+        Add pairing
+      </Button>
+      <div className="space-y-2">
+        <Label htmlFor="manualReason">Reason</Label>
+        <Input id="manualReason" name="reason" maxLength={1000} className={fieldClass} />
+      </div>
+      <Button type="submit" variant="lime" disabled={pending}>{pending ? "Saving…" : "Save manual draw"}</Button>
+    </form>
+  );
+}
+
 export function RemoveEligibilityButton({
   ruleId,
   competitionId,
