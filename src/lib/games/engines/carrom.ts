@@ -302,7 +302,7 @@ export const carromEngine: GameEngine<CarromState, CarromConfig> = {
     if (action.type === "rematch") {
       if (state.status !== "completed") return rejected(state, "Only a finished game can be reset.");
       return {
-        state: { ...carromEngine.create(), version: state.version + 1, seq: state.seq + 1 },
+        state: { ...carromEngine.create({}), version: state.version + 1, seq: state.seq + 1 },
         events: [{ type: "rematch", message: "A fresh carrom board is ready." }],
         accepted: true,
       };

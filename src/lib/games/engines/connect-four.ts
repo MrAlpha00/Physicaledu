@@ -87,7 +87,7 @@ export const connectFourEngine: GameEngine<ConnectFourState, ConnectFourConfig> 
     if (action.type === "rematch" || action.type === "reset") {
       if (state.status !== "completed") return rejected(state, "Only a finished game can be reset.");
       return {
-        state: { ...connectFourEngine.create(), version: state.version + 1, seq: state.seq + 1 },
+        state: { ...connectFourEngine.create({}), version: state.version + 1, seq: state.seq + 1 },
         events: [{ type: "rematch", message: "A fresh board is ready." }],
         accepted: true,
       };

@@ -61,12 +61,18 @@ function height(value: string): Height | null {
   return HEIGHTS.includes(value as Height) ? (value as Height) : null;
 }
 
-export function resolvePenalty(shot: ShotChoice, save: SaveChoice, index: number): boolean {
-  if (shot.direction === save.direction && shot.height === save.height) return false;
+export function resolvePenalty(shot: ShotChoice, save: SaveChoice, index: number): boolean {  if (shot.direction === save.direction && shot.height === save.height) return false;
   if (shot.direction === save.direction && shot.power < 70) return false;
   // Deterministic over-hit variance for ambitious power shots.
   if (shot.power > 92 && seededUnit("penalty", index, shot.power) < 0.16) return false;
   return true;
+}
+
+function canPenaltyAct(state: PenaltyState, actor: PlayerIndex, action: { type: string }): boolean {
+  if (state.status !== "active") return false;
+  if (action.type === "shoot") return state.current.attacker === actor && state.current.shot === null;
+  if (action.type === "save") return state.current.attacker !== actor && state.current.save === null;
+  return false;
 }
 
 export const penaltyEngine: GameEngine<PenaltyState, PenaltyConfig> = {
@@ -98,11 +104,7 @@ export const penaltyEngine: GameEngine<PenaltyState, PenaltyConfig> = {
   },
 
   canAct(state, actor, action) {
-    if (state.status !== "active") return false;
-    if (action.type === "shoot") return state.current.attacker === actor && state.current.shot === null;
-    if (action.type === "save") return state.current.attacker !== actor && state.current.save === null;
-    if (action.type === "rematch") return state.status === "completed";
-    return false;
+    return canPenaltyAct(state, actor, action);
   },
 
   legal(state, actor) {
@@ -125,7 +127,7 @@ export const penaltyEngine: GameEngine<PenaltyState, PenaltyConfig> = {
     }
     if (action.type !== "shoot" && action.type !== "save") return rejected(state, "Unknown penalty action.");
     if (state.status !== "active") return rejected(state, "This shootout has already finished.");
-    if (!penaltyEngine.canAct(state, action.actor, action)) return rejected(state, "That decision has already been submitted.");
+    if (!canPenaltyAct(state, action.actor, action)) return rejected(state, "That decision has already been submitted.");
 
     let current = { ...state.current };
     let events: Array<{ type: string; message: string }> = [];

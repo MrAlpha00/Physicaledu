@@ -81,7 +81,7 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeConfig> = {
     if (action.type === "rematch" || action.type === "reset") {
       if (state.status !== "completed") return rejected(state, "Only a finished game can be reset.");
       return {
-        state: { ...ticTacToeEngine.create(), version: state.version + 1, seq: state.seq + 1 },
+        state: { ...ticTacToeEngine.create({}), version: state.version + 1, seq: state.seq + 1 },
         events: [{ type: "rematch", message: "A fresh board is ready." }],
         accepted: true,
       };
