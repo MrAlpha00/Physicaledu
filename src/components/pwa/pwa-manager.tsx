@@ -121,6 +121,7 @@ export function PwaManager() {
     <div
       className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-end gap-2 px-4 sm:bottom-4 sm:px-6"
       aria-live="polite"
+      data-no-print
     >
       {offline ? (
         <div className="pointer-events-auto flex items-center gap-2 border border-navy/15 bg-navy px-4 py-3 text-xs font-bold text-chalk shadow-xl">
