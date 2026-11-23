@@ -349,7 +349,11 @@ export const carromEngine: GameEngine<CarromState, CarromConfig> = {
         { ...resolved.state, lastShot: shot, shotCount: state.shotCount + 1 },
       );
     }
-    return continued(resolved.events, undefined as never);
+    return continued(state, resolved.events, {
+      ...resolved.state,
+      lastShot: shot,
+      shotCount: state.shotCount + 1,
+    });
   },
 
   toJson(state) {
