@@ -45,6 +45,7 @@ describe("Phase 5 — ranked match integration", () => {
       action(3, match.version + 2, 0, 1), action(4, match.version + 3, 1, 4),
       action(5, match.version + 4, 0, 2),
     ];
+    let outcome: Outcome | null = null;
     for (const move of moves) {
       const result = applyAuthoritativeAction(match, move, {
         userId: move.actor === 0 ? "user-a" : "user-b",
@@ -52,16 +53,16 @@ describe("Phase 5 — ranked match integration", () => {
       expect(result.ok).toBe(true);
       if (!result.match) throw new Error("missing match");
       match = result.match;
+      outcome = result.outcome ?? null;
     }
 
     expect(match.status).toBe("completed");
-    const outcome = match.outcome as unknown as Outcome;
     expect(outcome).toMatchObject({ kind: "win", winner: 0 });
+    if (!outcome) throw new Error("missing outcome");
     expect(engineFor(match.slug).outcome(engineFor(match.slug).fromJson(match.state))).toEqual(outcome);
     expect(applyAuthoritativeAction(match, action(6, match.version, 1, 5), { userId: "user-b" }).ok).toBe(false);
 
     expect(ratingEligibility({
-      gameSlug: match.slug,
       mode: match.mode,
       status: match.status,
       outcome,
@@ -99,7 +100,6 @@ describe("Phase 5 — ranked match integration", () => {
     });
     expect(guest.players.every((player) => player.userId === null)).toBe(true);
     expect(ratingEligibility({
-      gameSlug: guest.slug,
       mode: guest.mode,
       status: "completed",
       outcome: { kind: "win", winner: 0, reason: "Local win." },

@@ -16,9 +16,9 @@ import {
   restrictionSchema,
   reviewSchema,
 } from "@/lib/validations/phase5";
-import { gameConfigFor, GAME_DEFINITIONS, GAME_LIST, GAME_SLUGS, isGameSlug } from "@/lib/games/catalog";
+import { gameConfigFor, GAME_DEFINITIONS, GAME_LIST, isGameSlug } from "@/lib/games/catalog";
 import { challengeChannelName, leaderboardChannelName, matchChannelName } from "@/lib/games/realtime";
-import { MODE_LABELS, validateEnvelope } from "@/lib/games/types";
+import { GAME_SLUGS, MODE_LABELS, validateEnvelope } from "@/lib/games/types";
 import { engineFor } from "@/lib/games/registry";
 
 const uuid = "11111111-1111-4111-8111-111111111111";
