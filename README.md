@@ -300,8 +300,9 @@ correct host. See [docs/PHASE_3_DEPLOYMENT.md](docs/PHASE_3_DEPLOYMENT.md).
 
 ## Verification status
 
-Phase 3 checks passed in this work: `npm run typecheck`, `npm run lint`,
-`npm test` (9 files / 74 tests) and `npm run build`. Migration checks are static;
-`0003` was not applied remotely and no live Supabase, R2, Resend, Turnstile,
-Realtime or webhook workflow was verified. Real accounts, devices and service
-credentials are still required.
+Phase 4 checks passed in this work: `npm run typecheck`, `npm run lint`,
+`npm test` (16 files / 137 tests) and `npm run build`. Migration checks are
+static; `0003` and `0004` were not applied remotely and no live Supabase, R2,
+Resend, Turnstile, Realtime or webhook workflow was verified. Real accounts,
+devices and service credentials are still required. See
+[docs/PHASE_4_DEPLOYMENT.md](docs/PHASE_4_DEPLOYMENT.md).
