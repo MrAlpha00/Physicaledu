@@ -284,4 +284,238 @@ create trigger competition_payment_settings_set_updated_at
 create trigger competition_payment_records_set_updated_at
   before update on public.competition_payment_records for each row execute function public.set_updated_at();
 
--- __PHASE4_PART2__
+/* ------------------------------------------------------------------------- */
+/* Tournament structure — relational source of truth for the canvas           */
+/* ------------------------------------------------------------------------- */
+
+create table public.tournament_draws (
+  id uuid primary key default gen_random_uuid(),
+  competition_id uuid not null references public.event_sports (id) on delete cascade,
+  format text not null check (format in ('knockout', 'round_robin', 'group_knockout')),
+  draw_mode text not null check (draw_mode in ('random', 'seeded', 'manual')),
+  draw_seed bigint not null default 0,
+  version integer not null default 1,
+  status text not null default 'active' check (status in ('draft', 'active', 'locked', 'archived')),
+  payload jsonb not null default '{}'::jsonb,
+  generated_by uuid references auth.users (id) on delete set null,
+  generated_at timestamptz not null default now(),
+  locked_at timestamptz,
+  locked_by uuid references auth.users (id) on delete set null,
+  lock_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index tournament_draws_competition_idx on public.tournament_draws (competition_id, status);
+create unique index tournament_draws_one_active_uidx
+  on public.tournament_draws (competition_id) where status in ('active', 'locked');
+
+create table public.tournament_stages (
+  id uuid primary key default gen_random_uuid(),
+  draw_id uuid not null references public.tournament_draws (id) on delete cascade,
+  stage_key text not null,
+  name text not null,
+  stage_type text not null check (stage_type in ('group', 'league', 'knockout', 'third_place')),
+  sequence integer not null default 1,
+  created_at timestamptz not null default now(),
+  constraint tournament_stages_unique unique (draw_id, stage_key)
+);
+
+create table public.tournament_groups (
+  id uuid primary key default gen_random_uuid(),
+  stage_id uuid not null references public.tournament_stages (id) on delete cascade,
+  group_key text not null,
+  name text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  constraint tournament_groups_unique unique (stage_id, group_key)
+);
+
+create table public.tournament_participants (
+  id uuid primary key default gen_random_uuid(),
+  draw_id uuid not null references public.tournament_draws (id) on delete cascade,
+  entry_id uuid references public.competition_entries (id) on delete restrict,
+  group_id uuid references public.tournament_groups (id) on delete set null,
+  placeholder_key text,
+  seed integer,
+  status text not null default 'active'
+    check (status in ('active', 'qualified', 'eliminated', 'withdrawn')),
+  created_at timestamptz not null default now(),
+  constraint tournament_participants_entry_unique unique (draw_id, entry_id),
+  constraint tournament_participants_placeholder_unique unique (draw_id, placeholder_key),
+  constraint tournament_participants_identity check (
+    entry_id is not null or placeholder_key is not null)
+);
+
+create table public.tournament_matches (
+  id uuid primary key default gen_random_uuid(),
+  draw_id uuid not null references public.tournament_draws (id) on delete cascade,
+  stage_id uuid references public.tournament_stages (id) on delete set null,
+  group_id uuid references public.tournament_groups (id) on delete set null,
+  round_key text not null,
+  round_name text not null,
+  round_number integer not null,
+  match_number integer not null,
+  status text not null default 'scheduled' check (status in (
+    'scheduled', 'ready', 'ongoing', 'result_submitted', 'completed',
+    'postponed', 'cancelled', 'disputed')),
+  starts_at timestamptz,
+  ends_at timestamptz,
+  venue text,
+  organizer_id uuid references auth.users (id) on delete set null,
+  winner_entry_id uuid references public.competition_entries (id) on delete set null,
+  is_bye boolean not null default false,
+  notes text,
+  calendar_event_id uuid references public.pe_calendar_events (id) on delete set null,
+  locked boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint tournament_matches_number_unique unique (draw_id, match_number)
+);
+
+create index tournament_matches_draw_idx on public.tournament_matches (draw_id, round_number);
+create index tournament_matches_organizer_idx on public.tournament_matches (organizer_id, status);
+
+create table public.tournament_match_slots (
+  match_id uuid not null references public.tournament_matches (id) on delete cascade,
+  slot text not null check (slot in ('a', 'b')),
+  entry_id uuid references public.competition_entries (id) on delete restrict,
+  participant_id uuid references public.tournament_participants (id) on delete set null,
+  source_match_id uuid references public.tournament_matches (id) on delete set null,
+  from_bye boolean not null default false,
+  primary key (match_id, slot)
+);
+
+create table public.tournament_match_results (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid not null unique references public.tournament_matches (id) on delete cascade,
+  score_a numeric(10,2),
+  score_b numeric(10,2),
+  breakdown jsonb not null default '[]'::jsonb,
+  winner_entry_id uuid references public.competition_entries (id) on delete restrict,
+  result_note text,
+  submitted_by uuid references auth.users (id) on delete set null,
+  submitted_at timestamptz not null default now(),
+  is_authoritative boolean not null default true,
+  approved_by uuid references auth.users (id) on delete set null,
+  approved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.tournament_match_result_history (
+  id bigint generated always as identity primary key,
+  match_id uuid not null references public.tournament_matches (id) on delete cascade,
+  result_id uuid,
+  actor_id uuid references auth.users (id) on delete set null,
+  action text not null,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table public.tournament_standings (
+  id uuid primary key default gen_random_uuid(),
+  draw_id uuid not null references public.tournament_draws (id) on delete cascade,
+  group_id uuid references public.tournament_groups (id) on delete cascade,
+  group_key text not null default 'overall',
+  entry_id uuid not null references public.competition_entries (id) on delete cascade,
+  position integer not null default 0,
+  played integer not null default 0,
+  wins integer not null default 0,
+  losses integer not null default 0,
+  draws integer not null default 0,
+  points_for numeric(10,2) not null default 0,
+  points_against numeric(10,2) not null default 0,
+  point_difference numeric(10,2) not null default 0,
+  competition_points numeric(10,2) not null default 0,
+  qualified boolean not null default false,
+  updated_at timestamptz not null default now(),
+  constraint tournament_standings_unique unique (draw_id, group_key, entry_id)
+);
+
+create table public.tournament_graph_edges (
+  id uuid primary key default gen_random_uuid(),
+  draw_id uuid not null references public.tournament_draws (id) on delete cascade,
+  source_match_id uuid not null references public.tournament_matches (id) on delete cascade,
+  target_match_id uuid not null references public.tournament_matches (id) on delete cascade,
+  target_slot text not null check (target_slot in ('a', 'b')),
+  feed text not null default 'winner' check (feed in ('winner', 'loser')),
+  created_at timestamptz not null default now(),
+  constraint tournament_graph_edges_unique unique (source_match_id, target_match_id, target_slot, feed),
+  constraint tournament_graph_edges_no_self check (source_match_id <> target_match_id)
+);
+
+create table public.tournament_node_positions (
+  draw_id uuid not null references public.tournament_draws (id) on delete cascade,
+  node_key text not null,
+  position jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (draw_id, node_key)
+);
+
+create trigger tournament_draws_set_updated_at
+  before update on public.tournament_draws for each row execute function public.set_updated_at();
+create trigger tournament_matches_set_updated_at
+  before update on public.tournament_matches for each row execute function public.set_updated_at();
+create trigger tournament_match_results_set_updated_at
+  before update on public.tournament_match_results for each row execute function public.set_updated_at();
+create trigger tournament_standings_set_updated_at
+  before update on public.tournament_standings for each row execute function public.set_updated_at();
+
+/* ------------------------------------------------------------------------- */
+/* Organisers and calendar links                                              */
+/* ------------------------------------------------------------------------- */
+
+create table public.sport_organizer_assignments (
+  id uuid primary key default gen_random_uuid(),
+  competition_id uuid not null references public.event_sports (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  student_directory_id uuid references public.student_directory (id) on delete set null,
+  assigned_by uuid references auth.users (id) on delete set null,
+  status text not null default 'active' check (status in ('active', 'revoked')),
+  can_submit_results boolean not null default true,
+  created_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  constraint sport_organizer_assignments_unique unique (competition_id, user_id)
+);
+
+create index sport_organizer_assignments_user_idx
+  on public.sport_organizer_assignments (user_id, status);
+
+create table public.organizer_invitations (
+  id uuid primary key default gen_random_uuid(),
+  competition_id uuid not null references public.event_sports (id) on delete cascade,
+  student_directory_id uuid not null references public.student_directory (id) on delete cascade,
+  token_hash text not null unique,
+  assigned_by uuid references auth.users (id) on delete set null,
+  expires_at timestamptz not null,
+  accepted_at timestamptz,
+  accepted_by uuid references auth.users (id) on delete set null,
+  revoked_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint organizer_invitations_expiry check (expires_at > created_at)
+);
+
+create index organizer_invitations_competition_idx
+  on public.organizer_invitations (competition_id, expires_at);
+
+create table public.organizer_activity_logs (
+  id bigint generated always as identity primary key,
+  competition_id uuid not null references public.event_sports (id) on delete cascade,
+  user_id uuid references auth.users (id) on delete set null,
+  match_id uuid references public.tournament_matches (id) on delete set null,
+  action text not null,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table public.phase4_calendar_links (
+  source_type text not null check (source_type in ('event', 'match')),
+  source_id uuid not null,
+  calendar_event_id uuid not null references public.pe_calendar_events (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (source_type, source_id)
+);
+
+-- __PHASE4_PART3__
+
