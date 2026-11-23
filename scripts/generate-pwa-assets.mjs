@@ -99,8 +99,6 @@ for (const [name, size, options] of outputs) {
   await sharp(Buffer.from(iconSvg(size, options))).png().toFile(path.join(outDir, name));
 }
 
-await sharp(Buffer.from(iconSvg(64))).ico().toFile(path.join(outDir, "favicon.ico"));
-
 await sharp(Buffer.from(screenshotSvg(1280, 720, false)))
   .png()
   .toFile(path.join(outDir, "screenshot-wide.png"));
