@@ -154,6 +154,10 @@ describe('Phase 4 tournament engine — formats', () => {
 
   it('produces identical plans for identical seeds', () => {
     const options = { format: 'knockout' as const, entries, drawSeed: 99 }
-    expect(generateTournament(options)).toEqual(generateTournament(options))
+    const withoutTimestamp = (plan: ReturnType<typeof generateTournament>) => {
+      const { generatedAt: _generatedAt, ...rest } = plan
+      return rest
+    }
+    expect(withoutTimestamp(generateTournament(options))).toEqual(withoutTimestamp(generateTournament(options)))
   })
 })
