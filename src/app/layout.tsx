@@ -3,7 +3,7 @@ import { Barlow_Condensed, Manrope } from "next/font/google";
 import "@xyflow/react/dist/style.css";
 import "./globals.css";
 import { PwaManager } from "@/components/pwa/pwa-manager";
-import { getSiteUrl } from "@/lib/env/public";
+import { getCanonicalSiteUrl } from "@/lib/env/public";
 
 const heading = Barlow_Condensed({
   subsets: ["latin"],
@@ -20,7 +20,7 @@ const body = Manrope({
   fallback: ["Segoe UI", "sans-serif"],
 });
 
-const siteUrl = getSiteUrl();
+const siteUrl = getCanonicalSiteUrl();
 const siteName = "VARSITY — College PE Management Platform";
 const siteDescription =
   "The digital home of the college Physical Education Department: student accounts, PE membership, classes, events, games and department administration.";
