@@ -221,13 +221,7 @@ function buildBracket(
       const sourceKey = roundMatchKeys[index];
       const sourceMatch = matches.find((match) => match.key === sourceKey);
       if (sourceMatch?.isBye && sourceMatch.byeWinnerEntryId) {
-        nextSlots.push({
-          entryId: sourceMatch.byeWinnerEntryId,
-          seed: sourceMatch.slotA.entryId === sourceMatch.byeWinnerEntryId
-            ? sourceMatch.slotA.seed ?? null
-            : null,
-          label: "",
-        });
+        nextSlots.push({ entryId: sourceMatch.byeWinnerEntryId, seed: null, label: "" });
       } else {
         nextSlots.push(null);
       }
@@ -504,7 +498,7 @@ export function generateTournament(options: TournamentGenerationOptions): Tourna
 export function generateManualKnockout(
   entries: TournamentEntry[],
   pairings: Array<[string | null, string | null]>,
-  options: TournamentGenerationOptions = { format: "knockout" },
+  options: TournamentGenerationOptions = { format: "knockout", entries: [] },
 ): TournamentPlan {
   const byId = new Map(entries.map((entry) => [entry.entryId, entry]));
   const firstRound: Array<TournamentEntry | null> = [];
