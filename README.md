@@ -9,6 +9,10 @@ entry/exit with live occupancy, QR posters and R2-backed file storage. Phase 3
 adds department management: equipment loans and maintenance, a bounded activity
 calendar, student feedback, a published-only game rules CMS, in-app
 notifications, optional Resend email, sports profiles and real reports/exports.
+Phase 4 adds sports events with unlimited sports, team/individual registration,
+private payment-proof verification, approval workflows, generated tournaments
+with an interactive bracket canvas, scoped organisers, live match management,
+public results and audited exports.
 
 The design direction is **VARSITY — Athletic Digital Experience**: collegiate
 athletics typography, a navy/chalk/lime palette and scoreboard-inspired data —
@@ -25,6 +29,7 @@ with real records only.
 | Auth integration | `@supabase/ssr` (cookies + proxy session refresh) |
 | Files & QR | Cloudflare R2, ExcelJS, JSZip, `qrcode`, `sharp`, `@zxing/browser` |
 | Charts & webhooks | Recharts (reports), Svix (Resend webhook signature verification) |
+| Tournament canvas | `@xyflow/react` (React Flow) |
 | Forms & abuse control | Cloudflare Turnstile (optional), honeypot + rate limiting |
 | Hosting | Vercel-compatible |
 | Testing | Vitest (pure logic), TypeScript, ESLint, production build |
