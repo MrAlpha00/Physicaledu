@@ -105,7 +105,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ slu
               <li><strong className="text-navy">Rated challenge:</strong> verified students only, with server-authoritative results.</li>
             </ul>
             <div className="mt-5">
-              <Button asChild variant="outline" size="sm"><Link href="/games/rules">All game rules <ArrowRight className="size-3" /></Link></Button>
+              <Button asChild variant="outline" size="sm"><Link href="/games/rules">How to play <ArrowRight className="size-3" /></Link></Button>
             </div>
           </section>
         </aside>
