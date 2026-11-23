@@ -290,8 +290,8 @@ buttons were added for them; Phase 4's tournament canvas is fully functional.
 ## Deployment
 
 Vercel-compatible. Configure the environment variables in the project settings,
-apply all three Supabase migrations in order (`0003` manually and once), create
-the private R2 bucket and CORS rules, then deploy with the default
+apply all four Supabase migrations in order (`0003` and `0004` manually and
+once), create the private R2 bucket and CORS rules, then deploy with the default
 `npm run build` command. For Phase 3 email, verify the Resend sender domain and
 configure a webhook to `<NEXT_PUBLIC_SITE_URL>/api/webhooks/resend` with a signed
 secret. Set `NEXT_PUBLIC_SITE_URL` to the deployed origin so email confirmation,
