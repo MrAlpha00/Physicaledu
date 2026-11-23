@@ -446,6 +446,170 @@ export type Phase4FileRow = {
   updated_at: string;
 };
 
+/* ------------------------------- Phase 5 -------------------------------- */
+
+export type Phase5GameSlug =
+  | "chess" | "carrom" | "tic-tac-toe" | "connect-four" | "penalty-shootout" | "basketball";
+export type Phase5MatchMode = "practice" | "friendly" | "ranked";
+export type Phase5MatchStatus =
+  | "waiting" | "countdown" | "active" | "completed" | "cancelled" | "abandoned" | "disputed";
+export type Phase5ChallengeStatus =
+  | "pending" | "accepted" | "rejected" | "cancelled" | "expired" | "match_created";
+
+export type Phase5GameRow = {
+  slug: Phase5GameSlug;
+  name: string;
+  short_name: string;
+  tagline: string;
+  description: string;
+  instructions: string;
+  rules: Json;
+  category: string;
+  accent: string;
+  sort_order: number;
+  is_enabled: boolean;
+  guest_enabled: boolean;
+  competitive_enabled: boolean;
+  challenge_enabled: boolean;
+  practice_enabled: boolean;
+  leaderboard_visible: boolean;
+  maintenance_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase5GameSettingsRow = {
+  game_slug: Phase5GameSlug;
+  starting_rating: number;
+  k_factor: number;
+  chess_time_controls: Json;
+  default_time_control: string;
+  default_attempts: number;
+  penalty_attempts: number;
+  queen_value: number;
+  coin_value: number;
+  sudden_death: boolean;
+  challenge_expiry_minutes: number;
+  challenge_rate_limit: number;
+  reconnection_grace_minutes: number;
+  season_key: string;
+  season_label: string;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase5GamingProfileRow = {
+  user_id: string;
+  gaming_name: string;
+  gaming_name_key: string;
+  visibility: "private" | "public";
+  searchable: boolean;
+  challenges_enabled: boolean;
+  allowed_challengers: string[];
+  bio: string | null;
+  is_moderated: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase5RatingRow = {
+  user_id: string;
+  game_slug: Phase5GameSlug;
+  season_key: string;
+  rating: number;
+  highest_rating: number;
+  played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  last_played_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase5RatingHistoryRow = {
+  id: string;
+  user_id: string;
+  game_slug: Phase5GameSlug;
+  match_id: string | null;
+  season_key: string;
+  before_rating: number;
+  after_rating: number;
+  delta: number;
+  outcome: "win" | "loss" | "draw";
+  reason: string;
+  created_at: string;
+};
+
+export type Phase5ChallengeRow = {
+  id: string;
+  game_slug: Phase5GameSlug;
+  challenger_id: string;
+  opponent_id: string;
+  status: Phase5ChallengeStatus;
+  settings: Json;
+  message: string | null;
+  expires_at: string;
+  responded_at: string | null;
+  match_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase5MatchRow = {
+  id: string;
+  public_id: string;
+  game_slug: Phase5GameSlug;
+  mode: Phase5MatchMode;
+  status: Phase5MatchStatus;
+  config: Json;
+  state: Json;
+  version: number;
+  server_seq: number;
+  outcome: Json | null;
+  challenge_id: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase5MatchPlayerRow = {
+  match_id: string;
+  player_index: number;
+  user_id: string | null;
+  display_name: string;
+  ready: boolean;
+  connected: boolean;
+  rating_before: number | null;
+  rating_after: number | null;
+  rating_delta: number | null;
+  joined_at: string;
+};
+
+export type Phase5ActionRow = {
+  id: number;
+  match_id: string;
+  player_index: number;
+  seq: number;
+  expected_version: number;
+  action_type: string;
+  payload: Json;
+  created_at: string;
+};
+
+export type Phase5ResultRow = {
+  match_id: string;
+  game_slug: Phase5GameSlug;
+  mode: Phase5MatchMode;
+  winner_index: number | null;
+  outcome: Json;
+  rating_applied: boolean;
+  created_at: string;
+};
+
 type Phase4Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
