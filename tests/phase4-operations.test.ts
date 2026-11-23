@@ -106,10 +106,9 @@ describe('Phase 4 integrated operations', () => {
       .mockReturnValueOnce(query({ id: 'achievement-1' }))
       .mockReturnValueOnce(query(null))
       .mockReturnValueOnce(query(null))
-      .mockReturnValueOnce(query(null))
     const created = await recordWinnerAchievements(entry, event, sport, 'match-1')
     expect(created).toBe(1)
-    const insertPayload = (fromMock.mock.results[4].value.insert as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    const insertPayload = (fromMock.mock.results[3].value.insert as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(insertPayload).toMatchObject({
       source_type: 'future_event',
       verification_status: 'pending',
