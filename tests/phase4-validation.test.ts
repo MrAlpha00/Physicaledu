@@ -95,7 +95,7 @@ describe('Phase 4 validation schemas', () => {
       ruleValue: { kg: 70 },
     }).ruleType).toBe('max_weight')
     expect(paymentSettingsSchema.parse({ competitionId: id }).paymentUnit).toBe('team')
-    expect(competitionRulesSchema.parse({ competitionId: id }).minTeamSize).toBeNull()
+    expect(competitionRulesSchema.parse({ competitionId: id }).minTeamSize).toBeUndefined()
     expect(resultSchema.parse({
       matchId: id,
       winnerEntryId: id2,

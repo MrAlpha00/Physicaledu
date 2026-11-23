@@ -233,8 +233,8 @@ describe('Phase 4 migration — application wiring', () => {
   })
 
   it('protects the student and organiser routes in middleware', () => {
-    expect(middleware).toContain("'/my-events'")
-    expect(middleware).toContain("'/organizer'")
+    expect(middleware).toContain('"/my-events"')
+    expect(middleware).toContain('"/organizer"')
     expect(middleware).toContain('PROTECTED_PREFIXES')
   })
 })
