@@ -2423,6 +2423,7 @@ export interface Database {
         };
         Returns: Json;
       };
+      phase6_admin_search: { Args: { p_query: string }; Returns: Json };
       phase5_finalize_timeout: {
         Args: {
           p_public_id: string;
