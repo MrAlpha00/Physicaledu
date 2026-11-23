@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { Brand } from "@/components/layout/brand";
+import { AdminSearch } from "@/components/layout/admin-search";
 import { signOutAction } from "@/app/auth/actions";
 import { cn, initials } from "@/lib/utils";
 
