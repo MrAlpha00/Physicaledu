@@ -624,6 +624,13 @@ type Phase3Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Relationships: [];
 };
 
+type Phase5Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
+  Row: Row;
+  Insert: Insert;
+  Update: Update;
+  Relationships: [];
+};
+
 export type Phase3FileRow = {
   id: string;
   object_key: string;
@@ -1754,6 +1761,111 @@ export interface Database {
         calendar_event_id: string;
         created_at: string;
       }>;
+
+      /* Phase 5 — games, challenges, matches, ratings and moderation */
+      game_catalog: Phase5Table<Phase5GameRow>;
+      game_settings: Phase5Table<Phase5GameSettingsRow>;
+      game_achievement_rules: Phase5Table<{
+        id: string;
+        code: string;
+        title: string;
+        description: string;
+        game_slug: Phase5GameSlug | null;
+        criteria: Json;
+        is_enabled: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      gaming_profiles: Phase5Table<Phase5GamingProfileRow>;
+      game_ratings: Phase5Table<Phase5RatingRow>;
+      game_rating_history: Phase5Table<Phase5RatingHistoryRow>;
+      game_challenges: Phase5Table<Phase5ChallengeRow>;
+      challenge_history: Phase5Table<{
+        id: number;
+        challenge_id: string;
+        actor_id: string | null;
+        from_status: string | null;
+        to_status: string;
+        reason: string | null;
+        created_at: string;
+      }>;
+      game_matches: Phase5Table<Phase5MatchRow>;
+      game_match_players: Phase5Table<Phase5MatchPlayerRow>;
+      game_match_actions: Phase5Table<Phase5ActionRow>;
+      game_match_state_snapshots: Phase5Table<{
+        id: number;
+        match_id: string;
+        version: number;
+        state: Json;
+        created_at: string;
+      }>;
+      game_match_results: Phase5Table<Phase5ResultRow>;
+      guest_game_sessions: Phase5Table<{
+        id: string;
+        anonymous_id: string;
+        game_slug: Phase5GameSlug;
+        created_at: string;
+        last_seen_at: string;
+        expires_at: string;
+      }>;
+      guest_match_sessions: Phase5Table<{
+        id: string;
+        guest_session_id: string | null;
+        game_slug: Phase5GameSlug;
+        state: Json;
+        status: "active" | "completed" | "expired";
+        created_at: string;
+        updated_at: string;
+        expires_at: string;
+      }>;
+      game_reports: Phase5Table<{
+        id: string;
+        reporter_id: string;
+        reported_user_id: string | null;
+        match_id: string | null;
+        game_slug: Phase5GameSlug | null;
+        reason: "abuse" | "cheating" | "harassment" | "inappropriate_name" | "dispute" | "other";
+        details: string | null;
+        status: "open" | "reviewing" | "resolved" | "dismissed";
+        reviewed_by: string | null;
+        review_note: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      match_disputes: Phase5Table<{
+        id: string;
+        match_id: string;
+        opened_by: string;
+        reason: string;
+        details: string | null;
+        status: "open" | "reviewing" | "resolved" | "rejected";
+        resolution: string | null;
+        reviewed_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      gaming_restrictions: Phase5Table<{
+        id: string;
+        user_id: string;
+        game_slug: Phase5GameSlug | null;
+        restriction_type: "all" | "ranked" | "challenge" | "public_profile";
+        reason: string;
+        is_active: boolean;
+        expires_at: string | null;
+        created_by: string | null;
+        created_at: string;
+      }>;
+      rating_adjustment_history: Phase5Table<{
+        id: string;
+        user_id: string;
+        game_slug: Phase5GameSlug;
+        before_rating: number;
+        after_rating: number;
+        delta: number;
+        reason: string;
+        adjusted_by: string;
+        created_at: string;
+      }>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -2253,6 +2365,81 @@ export interface Database {
           byte_size: number;
         }>;
       };
+
+      /* Phase 5 RPCs */
+      phase5_is_admin: { Args: Record<string, never>; Returns: boolean };
+      phase5_is_match_participant: { Args: { p_match_id: string; p_user_id?: string }; Returns: boolean };
+      phase5_game_enabled: { Args: { p_slug: string; p_mode?: string }; Returns: boolean };
+      phase5_public_profile_visible: { Args: { p_user_id: string }; Returns: boolean };
+      phase5_name_key: { Args: { p_name: string }; Returns: string };
+      phase5_ensure_profile: { Args: { p_gaming_name: string }; Returns: Phase5GamingProfileRow };
+      phase5_update_profile: {
+        Args: {
+          p_gaming_name?: string | null;
+          p_visibility?: string | null;
+          p_searchable?: boolean | null;
+          p_challenges_enabled?: boolean | null;
+          p_bio?: string | null;
+        };
+        Returns: Phase5GamingProfileRow;
+      };
+      phase5_search_profiles: {
+        Args: { p_query: string };
+        Returns: Array<{ user_id: string; gaming_name: string; department_name: string | null }>;
+      };
+      phase5_create_challenge: {
+        Args: { p_game_slug: string; p_opponent_id: string; p_settings?: Json | null; p_message?: string | null };
+        Returns: string;
+      };
+      phase5_respond_challenge: {
+        Args: { p_challenge_id: string; p_accept: boolean };
+        Returns: Json;
+      };
+      phase5_cancel_challenge: { Args: { p_challenge_id: string }; Returns: undefined };
+      phase5_expire_challenges: { Args: Record<string, never>; Returns: number };
+      phase5_set_ready: { Args: { p_public_id: string; p_ready: boolean }; Returns: Json };
+      phase5_set_connection: { Args: { p_public_id: string; p_connected: boolean }; Returns: undefined };
+      phase5_start_match: { Args: { p_public_id: string }; Returns: undefined };
+      phase5_open_dispute: {
+        Args: { p_public_id: string; p_reason: string; p_details?: string | null };
+        Returns: string;
+      };
+      phase5_submit_action: {
+        Args: {
+          p_public_id: string;
+          p_user_id: string;
+          p_actor: number;
+          p_seq: number;
+          p_expected_version: number;
+          p_type: string;
+          p_payload: Json;
+          p_state: Json;
+          p_events?: Json | null;
+          p_outcome?: Json | null;
+        };
+        Returns: Json;
+      };
+      phase5_admin_save_game: { Args: { p_slug: string; p_data: Json }; Returns: undefined };
+      phase5_admin_save_settings: { Args: { p_slug: string; p_data: Json }; Returns: undefined };
+      phase5_admin_adjust_rating: {
+        Args: { p_user_id: string; p_game_slug: string; p_new_rating: number; p_reason: string };
+        Returns: number;
+      };
+      phase5_admin_moderate_name: { Args: { p_user_id: string; p_action: string; p_note?: string | null }; Returns: undefined };
+      phase5_admin_review_report: { Args: { p_report_id: string; p_status: string; p_note?: string | null }; Returns: undefined };
+      phase5_admin_review_dispute: { Args: { p_dispute_id: string; p_status: string; p_resolution?: string | null }; Returns: undefined };
+      phase5_admin_set_restriction: {
+        Args: {
+          p_user_id: string;
+          p_game_slug: string;
+          p_type: string;
+          p_reason: string;
+          p_expires_at?: string | null;
+          p_active?: boolean;
+        };
+        Returns: string;
+      };
+      phase5_cleanup_guest_sessions: { Args: Record<string, never>; Returns: number };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
