@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { GameBoard } from "@/components/games";
 import {
@@ -17,6 +17,7 @@ import {
   startMatchAction,
   submitMatchAction,
 } from "@/app/(student)/games/actions";
+import { clientNowMs } from "@/lib/games/clock";
 import { matchChannelName, subscribeToChannel } from "@/lib/games/realtime";
 import { engineFor } from "@/lib/games/registry";
 import type { BaseState, GameSlug, MatchMode, PlayerIndex } from "@/lib/games/types";
@@ -67,25 +68,6 @@ export function GameStage({
   const [connection, setConnection] = useState(matchPublicId ? "connecting" : "live");
   const [countdown, setCountdown] = useState<number | null>(initialStatus === "countdown" ? 3 : null);
   const [pending, startTransition] = useTransition();
-  const activeRef = useRef(status === "active");
-  const lastRemoteRef = useRef({ initialState, initialStatus });
-  const countdownStatusRef = useRef(status);
-
-  // React's supported "adjust state during render" pattern keeps locally played
-  // moves while adopting each authoritative snapshot delivered by the server.
-  if (lastRemoteRef.current.initialState !== initialState || lastRemoteRef.current.initialStatus !== initialStatus) {
-    lastRemoteRef.current = { initialState, initialStatus };
-    setState(initialState);
-    setStatus(initialStatus);
-  }
-  if (countdownStatusRef.current !== status) {
-    countdownStatusRef.current = status;
-    setCountdown(status === "countdown" ? 3 : null);
-  }
-
-  useEffect(() => {
-    activeRef.current = status === "active";
-  }, [status]);
 
   const base = engine.fromJson(state) as BaseState;
   const active = engine.turn(base);
@@ -98,12 +80,13 @@ export function GameStage({
     const current = engine.fromJson(state) as BaseState;
 
     if (isLocal) {
+      const localPayload = slug === "chess" && type === "move" ? { ...payload, now: clientNowMs() } : payload;
       const result = engine.apply(current as never, {
         seq: current.seq + 1,
         expectedVersion: current.version,
         actor: (current.turn ?? viewer ?? 0) as PlayerIndex,
         type,
-        payload,
+        payload: localPayload,
       } as never, config as never);
       if (!result.accepted) {
         setError(result.reason ?? "That move was rejected.");
@@ -141,7 +124,7 @@ export function GameStage({
       if (response.outcome) setStatus("completed");
       router.refresh();
     });
-  }, [config, engine, isLocal, matchPublicId, router, state, viewer]);
+  }, [config, engine, isLocal, matchPublicId, router, slug, state, viewer]);
 
   useEffect(() => {
     if (!matchPublicId) return;

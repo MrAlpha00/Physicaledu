@@ -66,6 +66,7 @@ export default async function MatchRoomPage({ params }: { params: Promise<{ matc
       </section>
 
       <GameStage
+        key={`${match.public_id}:${match.version}:${match.status}`}
         slug={match.game_slug as GameSlug}
         mode="ranked"
         names={names}
