@@ -59,7 +59,7 @@ function useActionFeedback() {
       if (result.status === "success" && refresh) router.refresh();
     });
   };
-  return { notice, pending, run };
+  return { notice, pending, run, setNotice, startTransition, router };
 }
 
 export function EventStatusControl({
@@ -415,7 +415,7 @@ export function OrganizerInviteForm({
   competitionId: string;
   students: Array<{ id: string; fullName: string; usn: string }>;
 }) {
-  const { notice, pending, run } = useActionFeedback();
+  const { notice, pending, setNotice, startTransition, router } = useActionFeedback();
   const [link, setLink] = useState("");
   return (
     <form

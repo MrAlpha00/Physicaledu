@@ -19,7 +19,7 @@ import {
 import { saveCanvasPositions } from "@/app/(admin)/admin/events/[eventId]/tournament/actions";
 import { Phase4ActionNotice } from "@/components/phase4/action-notice";
 import { Button } from "@/components/ui/button";
-import { extractNodePositions, type CanvasEdge, type CanvasNodeData } from "@/lib/tournament/graph";
+import { extractNodePositions, type CanvasEdge, type CanvasNode, type CanvasNodeData } from "@/lib/tournament/graph";
 import type { ActionState } from "@/types/domain";
 
 type MatchFlowNode = Node<CanvasNodeData, "matchNode">;
