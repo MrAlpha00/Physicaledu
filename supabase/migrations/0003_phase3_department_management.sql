@@ -1,7 +1,8 @@
 -- VARSITY — Phase 3: department management
 -- Additive only: no drop, no destructive alteration, no replacement of Phase 1/2 data.
 -- Apply once, after 0001_phase1_foundation.sql and 0002_phase2_daily_operations.sql.
--- This migration is prepared locally only; do not apply it to a remote project from this task.
+-- This file is part of the ordered migration set; applying it is an explicit
+-- deployment decision and is not performed by this repository change.
 
 create extension if not exists pgcrypto;
 

@@ -1760,6 +1760,8 @@ grant select on public.attendance_sessions, public.attendance_records,
   public.task_submission_history, public.stored_files, public.pe_rooms,
   public.room_activities, public.room_sessions, public.qr_codes to authenticated;
 grant select on public.visitor_purposes to anon, authenticated;
+-- Matches the Phase 1 "departments_public_active_read" anon SELECT policy.
+grant select on public.departments to anon;
 grant select, insert, update, delete on public.visitor_purposes to authenticated;
 
 revoke all on function public.ist_day_start(date) from public;

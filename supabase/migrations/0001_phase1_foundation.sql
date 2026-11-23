@@ -31,37 +31,6 @@ begin
 end;
 $$;
 
--- Roles are stored in a table; this definer function prevents recursive RLS
--- evaluation when a policy needs to know whether the caller is a PE admin.
-create or replace function public.is_pe_admin(p_user_id uuid default auth.uid())
-returns boolean
-language sql
-security definer
-stable
-set search_path = public, pg_temp
-as $$
-  select exists (
-    select 1 from public.user_roles
-    where user_id = p_user_id and role = 'pe_admin'
-  );
-$$;
-
-create or replace function public.has_role(
-  p_role text,
-  p_user_id uuid default auth.uid()
-)
-returns boolean
-language sql
-security definer
-stable
-set search_path = public, pg_temp
-as $$
-  select exists (
-    select 1 from public.user_roles
-    where user_id = p_user_id and role = p_role
-  );
-$$;
-
 -- ---------------------------------------------------------------------------
 -- Tables
 -- ---------------------------------------------------------------------------
@@ -149,6 +118,39 @@ create table public.user_roles (
 
 create index user_roles_role_idx on public.user_roles (role);
 
+-- Roles are stored in a table; this definer function prevents recursive RLS
+-- evaluation when a policy needs to know whether the caller is a PE admin.
+-- Both helpers are defined here so public.user_roles already exists when the
+-- SQL-language bodies are validated at CREATE FUNCTION time.
+create or replace function public.is_pe_admin(p_user_id uuid default auth.uid())
+returns boolean
+language sql
+security definer
+stable
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from public.user_roles
+    where user_id = p_user_id and role = 'pe_admin'
+  );
+$$;
+
+create or replace function public.has_role(
+  p_role text,
+  p_user_id uuid default auth.uid()
+)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from public.user_roles
+    where user_id = p_user_id and role = p_role
+  );
+$$;
+
 create table public.pe_memberships (
   id uuid primary key default gen_random_uuid(),
   student_directory_id uuid not null
@@ -189,9 +191,7 @@ create table public.import_batches (
 create index import_batches_created_idx on public.import_batches (created_at desc);
 
 -- The column is declared in the table definition above. Add only the missing
--- foreign key here. Repeating `add column` raises 42701 and, in the SQL Editor's
--- implicit transaction, rolls back the whole Phase 1 script (including
--- public.user_roles), which is the historical cause of the 42P01 bootstrap error.
+-- foreign key here; repeating `add column` would raise 42701 (duplicate column).
 alter table public.student_directory
   add constraint student_directory_source_import_batch_fkey
   foreign key (source_import_batch_id)
