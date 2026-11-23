@@ -5,7 +5,6 @@ import { BoardShell } from "@/components/games/common";
 import type { BoardProps } from "./board-types";
 import { chessFromFen, legalChessMoves, timeControlMs, type ChessState } from "@/lib/games/engines/chess";
 import { cn } from "@/lib/utils";
-import type { Json } from "@/types/database";
 
 const GLYPHS: Record<string, Record<string, string>> = {
   w: { k: "♔", q: "♕", r: "♖", b: "♗", n: "♘", p: "♙" },

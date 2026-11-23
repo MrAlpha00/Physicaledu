@@ -129,7 +129,7 @@ export const penaltyEngine: GameEngine<PenaltyState, PenaltyConfig> = {
     if (state.status !== "active") return rejected(state, "This shootout has already finished.");
     if (!canPenaltyAct(state, action.actor, action)) return rejected(state, "That decision has already been submitted.");
 
-    let current = { ...state.current };
+    const current = { ...state.current };
     let events: Array<{ type: string; message: string }> = [];
 
     if (action.type === "shoot") {

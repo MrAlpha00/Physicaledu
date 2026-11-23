@@ -5,7 +5,6 @@ import {
   completed,
   continued,
   rejected,
-  type GameAction,
   type GameEngine,
   type Outcome,
   type PlayerIndex,

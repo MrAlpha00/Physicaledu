@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BoardShell } from "@/components/games/common";
 import type { BoardProps } from "./board-types";
 import { shotQuality, type BasketballState } from "@/lib/games/engines/basketball";

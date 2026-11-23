@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Json } from "@/types/database";
 import type { GameAction, PlayerIndex } from "@/lib/games/types";
 import { ticTacToeEngine, findWinner, type TicTacToeState } from "@/lib/games/engines/tic-tac-toe";
-import { connectFourEngine, landingRow, type ConnectFourState } from "@/lib/games/engines/connect-four";
+import { connectFourEngine, landingRow } from "@/lib/games/engines/connect-four";
 import { chessEngine, chessFromFen, type ChessState } from "@/lib/games/engines/chess";
 import { penaltyEngine, resolvePenalty, type PenaltyState } from "@/lib/games/engines/penalty-shootout";
 import { basketballEngine, resolveShot, shotQuality, type BasketballState } from "@/lib/games/engines/basketball";
@@ -96,7 +96,7 @@ describe("Phase 5 — pure game engines", () => {
     expect(resolvePenalty({ direction: "left", height: "low", power: 60 }, { direction: "left", height: "low" }, 0)).toBe(false);
     expect(resolvePenalty({ direction: "left", height: "low", power: 60 }, { direction: "right", height: "high" }, 0)).toBe(true);
 
-    let state = penaltyEngine.create({ attempts: 1, suddenDeath: false });
+    const state = penaltyEngine.create({ attempts: 1, suddenDeath: false });
     let step = penaltyEngine.apply(state, action(0, 1, "shoot", { direction: "left", height: "low", power: 60 }), {});
     expect(step.accepted).toBe(true);
     expect(step.state.current.shot).not.toBeNull();

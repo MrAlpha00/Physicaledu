@@ -1,6 +1,6 @@
 /** Small deterministic helpers shared by the pure game engines. */
 import type { Json } from "@/types/database";
-import type { BaseState, GameAction, PlayerIndex } from "./types";
+import type { BaseState, PlayerIndex } from "./types";
 
 export function num(payload: Record<string, Json>, key: string, fallback = 0): number {
   const value = payload[key];
