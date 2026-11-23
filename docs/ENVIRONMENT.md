@@ -67,6 +67,18 @@ notifications and calendar sync reuse the Phase 3 tables and functions. There
 is no new secret and no `NEXT_PUBLIC_*` value for Phase 4. See
 [PHASE_4_DEPLOYMENT.md](PHASE_4_DEPLOYMENT.md) for the migration and R2 checklist.
 
+## Phase 5 (no new variables)
+
+Games reuse the existing Supabase project and SSR clients; there is no new
+secret and no `NEXT_PUBLIC_*` value for Phase 5. Rated match writes go through
+the existing server-only privileged client and the `service_role`-only
+`phase5_submit_action` RPC. Realtime uses the same project URL/publishable key
+with RLS-protected, namespaced channels. Guest/practice play needs no
+credentials at all. Challenge and result notifications reuse Phase 3 in-app
+notifications, and optional Resend/R2 variables are unaffected. See
+[GAME_DEPLOYMENT.md](GAME_DEPLOYMENT.md) for the migration and publication
+checklist.
+
 ## Missing variables
 
 The app reports missing variables by **name only** (for example,

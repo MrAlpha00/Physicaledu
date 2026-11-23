@@ -12,7 +12,9 @@ notifications, optional Resend email, sports profiles and real reports/exports.
 Phase 4 adds sports events with unlimited sports, team/individual registration,
 private payment-proof verification, approval workflows, generated tournaments
 with an interactive bracket canvas, scoped organisers, live match management,
-public results and audited exports.
+public results and audited exports. Phase 5 adds six first-party games with
+local guest play, student challenges, server-authoritative multiplayer rooms,
+independent per-game Elo ratings, leaderboards and moderation.
 
 The design direction is **VARSITY — Athletic Digital Experience**: collegiate
 athletics typography, a navy/chalk/lime palette and scoreboard-inspired data —
@@ -74,10 +76,12 @@ by the provider is tracked separately.
 3. Apply the database migrations in order: `0001_phase1_foundation.sql`, then
    `0002_phase2_daily_operations.sql`, then the additive
    `0003_phase3_department_management.sql`, then the additive
-   `0004_phase4_events_tournaments.sql`. Apply `0003` and `0004` once manually
-   after their predecessors; neither was applied remotely during this work. See
-   [docs/DATABASE.md](docs/DATABASE.md) and
-   [docs/PHASE_4_DEPLOYMENT.md](docs/PHASE_4_DEPLOYMENT.md). Never reset a remote
+   `0004_phase4_events_tournaments.sql`, then the additive
+   `0005_phase5_games_multiplayer.sql`. Apply `0003`, `0004` and `0005` once
+   manually after their predecessors; none was applied remotely during this
+   work. See [docs/DATABASE.md](docs/DATABASE.md),
+   [docs/PHASE_4_DEPLOYMENT.md](docs/PHASE_4_DEPLOYMENT.md) and
+   [docs/GAME_DEPLOYMENT.md](docs/GAME_DEPLOYMENT.md). Never reset a remote
    database with real records.
 
 4. Create the first PE administrator: see
@@ -141,6 +145,11 @@ npm test           # Vitest unit tests
 | `/api/phase4/exports`, `/print/phase4` | Phase 4 XLSX/CSV exports and print view |
 | `/api/phase4/files/[id]/download` | Authorised signed file/proof download |
 | `/api/webhooks/resend` | Signed Resend delivery webhook |
+| `/games`, `/games/rules`, `/games/[slug]` | Public game library, rules and game detail |
+| `/games/[slug]/guest`, `/games/[slug]/leaderboard` | Local guest play and public per-game leaderboard |
+| `/games/dashboard`, `/games/challenges`, `/games/challenge/[slug]` | Student ratings, invitations and opponent search |
+| `/games/history`, `/games/profile`, `/games/match/[matchId]` | Results, gaming identity and authoritative match room |
+| `/admin/games`, `/admin/games/moderation`, `/admin/games/ratings` | Game catalog, moderation and rating ledger |
 | `/unauthorized` | Permission denied page |
 
 ## Phase 1 features
@@ -242,6 +251,32 @@ npm test           # Vitest unit tests
   [PHASE_4_ORGANIZERS.md](docs/PHASE_4_ORGANIZERS.md),
   [PHASE_4_DEPLOYMENT.md](docs/PHASE_4_DEPLOYMENT.md).
 
+## Phase 5 features
+
+- Six first-party games: Chess, Carrom, Tic-Tac-Toe, Connect Four, Penalty
+  Shootout and Basketball Free-Throw, each backed by a pure TypeScript engine
+  (Chess rules via `chess.js`).
+- Guest/practice boards are strictly local and unrated: no Elo, achievements,
+  verified history or ranked match rows.
+- Opt-in gaming profiles, public opponent search, invitations with
+  expiry/duplicate/rate-limit checks and accept/reject/cancel lifecycle.
+- Opaque match rooms with readiness, countdown, turn/score state, reconnection,
+  resignation, rematch, reports and disputes; Supabase Realtime only refreshes
+  views.
+- Server-authoritative actions: identity, turn, sequence and version are
+  checked before a pure engine transition and a `service_role`-only RPC persists
+  state and outcome.
+- Independent per-game Elo ratings, public leaderboards, rating history,
+  audited admin adjustments and dispute freezes.
+- Guides: [PHASE_5.md](docs/PHASE_5.md),
+  [GAMES_OVERVIEW.md](docs/GAMES_OVERVIEW.md),
+  [GUEST_GAMES.md](docs/GUEST_GAMES.md),
+  [MULTIPLAYER_ARCHITECTURE.md](docs/MULTIPLAYER_ARCHITECTURE.md),
+  [GAME_RANKING_SYSTEM.md](docs/GAME_RANKING_SYSTEM.md),
+  [GAME_SECURITY.md](docs/GAME_SECURITY.md),
+  [GAME_ADMINISTRATION.md](docs/GAME_ADMINISTRATION.md),
+  [GAME_DEPLOYMENT.md](docs/GAME_DEPLOYMENT.md).
+
 ## Architecture
 
 ```text
@@ -270,9 +305,12 @@ src/
     utils/             normalisation, formatting, import parsing, rate limiting
     validations/       centralised Zod schemas
     tournament/        pure Phase 4 engine, graph, standings and scoring
+    games/             pure Phase 5 engines, catalog, rating, challenges,
+                       authoritative match service and realtime transport
   components/phase4/   event controls and React Flow bracket canvas
+  components/games/    six boards and the local/ranked game shell
   types/               database and view-model types
-supabase/migrations/   phase 1, 2, 3 and 4 additive SQL migrations
+supabase/migrations/   phase 1, 2, 3, 4 and 5 additive SQL migrations
 docs/                  setup, database, admin and phase documentation
 tests/                 unit tests for pure logic
 ```

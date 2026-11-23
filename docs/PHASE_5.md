@@ -91,7 +91,7 @@ tests/phase5-*.test.ts         engines, challenges, ratings, security,
 4. **RLS is always on.** Never disable RLS to make Realtime work. Participant
    reads are enforced by policies and definer helpers.
 5. **Ratings are isolated per game.** A Chess result never changes Carrom rating.
-6. **Guest/practice are local only.** They cannot emit ranked state or use a
+6. **Guest/practice are local only.** They cannot emit ranked state or call an
    authoritative RPC.
 
 Ranked chess moves are a concrete example of rule 2: the browser does not send a

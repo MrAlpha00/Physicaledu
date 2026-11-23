@@ -287,3 +287,74 @@ Module guides: [PHASE_4.md](PHASE_4.md),
 [PHASE_4_TOURNAMENTS.md](PHASE_4_TOURNAMENTS.md),
 [PHASE_4_ORGANIZERS.md](PHASE_4_ORGANIZERS.md) and
 [PHASE_4_DEPLOYMENT.md](PHASE_4_DEPLOYMENT.md).
+
+## Phase 5 — games and multiplayer
+
+Apply `supabase/migrations/0005_phase5_games_multiplayer.sql` once after `0004`.
+It is additive and was not applied remotely during this work. Never reset a
+remote database. See [GAME_DEPLOYMENT.md](GAME_DEPLOYMENT.md).
+
+### Phase 5 tables
+
+| Table | Purpose |
+| --- | --- |
+| `game_catalog` | Admin-editable display copy, enablement flags and ordering for the six games |
+| `game_settings` | Per-game rating, challenge, attempt, clock and season parameters |
+| `game_achievement_rules` | Rules for `future_game` achievement suggestions |
+| `gaming_profiles` | Opt-in gaming identity, visibility/search/challenge flags; no USN or email |
+| `game_ratings` | One record per user per game (rating, peak, played, wins/losses/draws) |
+| `game_rating_history` | Auditable per-match Elo deltas for leaderboards and disputes |
+| `game_challenges`, `challenge_history` | Invitations, settings, expiry and every status transition |
+| `game_matches` | Versioned authoritative match state, sequence, status and outcome |
+| `game_match_players` | Participant identity, readiness, connection and per-match rating deltas |
+| `game_match_actions` | Accepted intents with `seq`, `expected_version`, payload and events |
+| `game_match_state_snapshots` | Prior state versions for audit/forensics |
+| `game_match_results` | Final outcomes and whether ratings were applied |
+| `guest_game_sessions`, `guest_match_sessions` | Optional expiring anonymous session rows; current guest flow writes none |
+| `game_reports`, `match_disputes` | Abuse reports and result disputes |
+| `gaming_restrictions` | Timed ranked-play restrictions |
+| `rating_adjustment_history` | Reasoned manual rating corrections |
+
+### Important Phase 5 functions
+
+- Guards: `phase5_is_admin`, `phase5_is_match_participant`,
+  `phase5_game_enabled`, `phase5_is_restricted`,
+  `phase5_public_profile_visible`, `phase5_name_key`.
+- Profile/discovery: `phase5_ensure_profile`, `phase5_update_profile`,
+  `phase5_search_profiles`.
+- Challenge/room: `phase5_create_challenge`, `phase5_respond_challenge`,
+  `phase5_cancel_challenge`, `phase5_expire_challenges`, `phase5_set_ready`,
+  `phase5_set_connection`, `phase5_start_match`, `phase5_open_dispute`.
+- Authoritative write: `phase5_submit_action` — granted **only to
+  `service_role`**; called solely by the Next.js server action.
+- Admin: `phase5_admin_save_game`, `phase5_admin_save_settings`,
+  `phase5_admin_adjust_rating`, `phase5_admin_moderate_name`,
+  `phase5_admin_review_report`, `phase5_admin_review_dispute`,
+  `phase5_admin_set_restriction`.
+- Cleanup: `phase5_cleanup_guest_sessions`.
+
+All privileged functions use `security definer` with pinned
+`search_path = public, pg_temp` and re-check the caller inside PostgreSQL.
+
+### Phase 5 RLS summary
+
+| Data | Public | Student | Participants | PE Admin |
+| --- | --- | --- | --- | --- |
+| Catalog/settings | Read-only public projection | Read-only | Read-only | Manage |
+| Gaming profiles | Public visibility/search only | Own profile | Own profile | Read/moderate |
+| Ratings & leaderboards | Public, non-moderated, opted-in | Own + public | Own + public | All + adjust |
+| Challenges | None | Own only | Own only | Read/moderate |
+| Matches, players, actions, snapshots, results | **None** | **None** | Own rooms only | All |
+| Reports/disputes | None | Own insert/read | Own insert/read | Review all |
+| Restrictions/adjustment history | None | None | None | All |
+
+RLS is enabled on every Phase 5 table and is never disabled for Realtime. The
+publication adds only the five named tables; realtime messages are advisory and
+never carry authoritative state.
+
+Module guides: [PHASE_5.md](PHASE_5.md),
+[GAMES_OVERVIEW.md](GAMES_OVERVIEW.md),
+[MULTIPLAYER_ARCHITECTURE.md](MULTIPLAYER_ARCHITECTURE.md),
+[GAME_RANKING_SYSTEM.md](GAME_RANKING_SYSTEM.md),
+[GAME_SECURITY.md](GAME_SECURITY.md) and
+[GAME_ADMINISTRATION.md](GAME_ADMINISTRATION.md).
