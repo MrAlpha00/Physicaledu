@@ -64,15 +64,24 @@ export function GameStage({
   const [status, setStatus] = useState(initialStatus);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [connection, setConnection] = useState("live");
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [connection, setConnection] = useState(matchPublicId ? "connecting" : "live");
+  const [countdown, setCountdown] = useState<number | null>(initialStatus === "countdown" ? 3 : null);
   const [pending, startTransition] = useTransition();
   const activeRef = useRef(status === "active");
+  const lastRemoteRef = useRef({ initialState, initialStatus });
+  const countdownStatusRef = useRef(status);
 
-  useEffect(() => {
+  // React's supported "adjust state during render" pattern keeps locally played
+  // moves while adopting each authoritative snapshot delivered by the server.
+  if (lastRemoteRef.current.initialState !== initialState || lastRemoteRef.current.initialStatus !== initialStatus) {
+    lastRemoteRef.current = { initialState, initialStatus };
     setState(initialState);
     setStatus(initialStatus);
-  }, [initialState, initialStatus]);
+  }
+  if (countdownStatusRef.current !== status) {
+    countdownStatusRef.current = status;
+    setCountdown(status === "countdown" ? 3 : null);
+  }
 
   useEffect(() => {
     activeRef.current = status === "active";
@@ -136,7 +145,6 @@ export function GameStage({
 
   useEffect(() => {
     if (!matchPublicId) return;
-    setConnection("connecting");
     let disposed = false;
     let unsubscribe: (() => void) | undefined;
     void subscribeToChannel(matchChannelName(matchPublicId), () => {
