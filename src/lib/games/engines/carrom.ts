@@ -272,7 +272,7 @@ function scoreAndTurn(
 export const carromEngine: GameEngine<CarromState, CarromConfig> = {
   slug: "carrom",
 
-  create() {
+  create(_config: CarromConfig = {}) {
     return {
       version: 1,
       seq: 0,

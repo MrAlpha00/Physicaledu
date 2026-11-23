@@ -47,7 +47,7 @@ export function findWinner(board: Array<Mark | null>): { mark: Mark; line: reado
 export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeConfig> = {
   slug: "tic-tac-toe",
 
-  create() {
+  create(_config: TicTacToeConfig = {}) {
     return {
       version: 1,
       seq: 0,

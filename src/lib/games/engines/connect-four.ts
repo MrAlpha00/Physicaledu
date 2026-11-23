@@ -54,7 +54,7 @@ export function winningLine(board: ConnectFourBoard, column: number, row: number
 export const connectFourEngine: GameEngine<ConnectFourState, ConnectFourConfig> = {
   slug: "connect-four",
 
-  create() {
+  create(_config: ConnectFourConfig = {}) {
     return {
       version: 1,
       seq: 0,
