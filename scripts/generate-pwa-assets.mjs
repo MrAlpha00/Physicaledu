@@ -119,4 +119,4 @@ await writeFile(
   "utf8",
 );
 
-console.log(`Generated ${outputs.length + 3} VARSITY PWA assets in public/icons.`);
+console.log(`Generated ${outputs.length + 2} VARSITY PWA assets in public/icons.`);
