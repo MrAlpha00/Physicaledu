@@ -11,6 +11,6 @@ export const config = {
      * Match all routes except static files and images. Skipping _next avoids
      * running auth on asset requests.
      */
-    "/((?!_next/static|_next/image|favicon.ico|icons/|templates/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons/|templates/|sw\\.js|manifest\\.webmanifest|offline|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
   ],
 };
