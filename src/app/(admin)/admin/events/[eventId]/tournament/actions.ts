@@ -8,7 +8,8 @@ import { generateManualKnockout, generateTournament } from "@/lib/tournament/eng
 import { validateTournamentGraph } from "@/lib/tournament/graph";
 import { recordWinnerAchievements, syncMatchToCalendar } from "@/lib/operations/phase4";
 import { drawSchema, matchScheduleSchema, resultSchema } from "@/lib/validations/phase4";
-import type { Json, TournamentPlan } from "@/types/database";
+import type { PointsConfig, TournamentPlan } from "@/lib/tournament/types";
+import type { Json } from "@/types/database";
 
 function firstIssue(error: z.ZodError): string {
   return error.issues[0]?.message ?? "Check the form and try again.";
@@ -90,7 +91,7 @@ export async function generateTournamentAction(input: z.input<typeof drawSchema>
       groupCount: context.sport.group_count ?? undefined,
       qualifiersPerGroup: context.sport.qualifiers_per_group ?? undefined,
       legs: context.sport.legs,
-      points: context.sport.points as TournamentPlan["points"],
+      points: context.sport.points as PointsConfig,
       version: 1,
     });
     return await persistPlan(parsed.data.competitionId, context.sport.event_id, plan, parsed.data.reason ?? null);
@@ -116,8 +117,11 @@ export async function saveManualPairings(input: z.input<typeof manualDrawSchema>
   if (!context) return { status: "error", message: "Competition not found." };
   try {
     const plan = generateManualKnockout(context.entries, parsed.data.pairings, {
+      format: "knockout",
+      entries: context.entries,
       drawSeed: 0,
-      points: context.sport.points as TournamentPlan["points"],
+      points: context.sport.points as PointsConfig,
+      thirdPlace: context.sport.third_place,
     });
     return await persistPlan(parsed.data.sportId, parsed.data.eventId, plan, parsed.data.reason || null);
   } catch (caught) {
@@ -237,22 +241,14 @@ async function maybeRecordFinalAchievement(matchId: string): Promise<void> {
   const supabase = await createClient();
   const { data: match } = await supabase.from("tournament_matches").select("*").eq("id", matchId).maybeSingle();
   if (!match?.winner_entry_id || match.round_name !== "Final") return;
-  const { data: draw } = await supabase.from("tournament_draws").select("*").eq("id", match.draw_id).maybeSingle();
-  if (!draw) return;
-  const [{ data: entry }, { data: sport }, { data: event }] = await Promise.all([
+  const { data: sport } = await supabase
+    .from("event_sports").select("*").eq("id", match.competition_id).maybeSingle();
+  if (!sport) return;
+  const [{ data: entry }, { data: event }] = await Promise.all([
     supabase.from("competition_entries").select("*").eq("id", match.winner_entry_id).maybeSingle(),
-    supabase.from("event_sports").select("*").eq("id", draw.competition_id).maybeSingle(),
-    supabase.from("sports_events").select("*").eq("id", (await supabase
-      .from("sports_events").select("id").eq("id", (sportEventId => sportEventId)(draw.competition_id)).maybeSingle()).data?.id ?? "").maybeSingle(),
+    supabase.from("sports_events").select("*").eq("id", sport.event_id).maybeSingle(),
   ]);
-  void sport;
-  void event;
-  if (!entry) return;
-  const sportRow = await supabase.from("event_sports").select("*").eq("id", draw.competition_id).maybeSingle();
-  const eventRow = sportRow?.data
-    ? await supabase.from("sports_events").select("*").eq("id", sportRow.data.event_id).maybeSingle()
-    : { data: null };
-  if (sportRow.data && eventRow.data) {
-    await recordWinnerAchievements(entry, eventRow.data, sportRow.data, matchId);
+  if (entry && event) {
+    await recordWinnerAchievements(entry, event, sport, matchId);
   }
 }

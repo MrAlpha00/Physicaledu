@@ -9,10 +9,12 @@ import {
   competitionRulesSchema,
   eligibilityRuleSchema,
   eventSchema,
+  eventStatusSchema,
   paymentSettingsSchema,
   sportSchema,
 } from "@/lib/validations/phase4";
 import type { ActionState } from "@/types/domain";
+import type { Json } from "@/types/database";
 
 function firstIssue(error: z.ZodError): string {
   return error.issues[0]?.message ?? "Check the form and try again.";
@@ -66,11 +68,10 @@ export async function saveEvent(input: z.input<typeof eventSchema>): Promise<
 
 export async function setEventStatus(eventId: string, status: string): Promise<ActionState> {
   await requirePeAdmin();
-  if (!["draft", "published", "registration_open", "registration_closed", "ongoing", "completed", "archived"].includes(status)) {
-    return { status: "error", message: "Unsupported event status." };
-  }
+  const parsed = eventStatusSchema.safeParse(status);
+  if (!parsed.success) return { status: "error", message: "Unsupported event status." };
   const supabase = await createClient();
-  const { error } = await supabase.from("sports_events").update({ status }).eq("id", eventId);
+  const { error } = await supabase.from("sports_events").update({ status: parsed.data }).eq("id", eventId);
   if (error) return { status: "error", message: error.message };
   const { data: event } = await supabase.from("sports_events").select("*").eq("id", eventId).maybeSingle();
   if (event) await syncEventToCalendar(event);
@@ -112,7 +113,7 @@ export async function saveSport(input: z.input<typeof sportSchema>): Promise<
       draw: data.pointsDraw,
       loss: data.pointsLoss,
       tiebreakers: data.tiebreakers,
-    },
+    } as unknown as Json,
     auto_advance: data.autoAdvance,
     organizer_results_require_approval: data.organizerResultsRequireApproval,
   };
@@ -159,7 +160,7 @@ export async function saveCompetitionRules(input: z.input<typeof competitionRule
     require_member_confirmation: data.requireMemberConfirmation,
     require_manual_identity_verification: data.requireManualIdentityVerification,
     required_participant_fields: data.requiredParticipantFields,
-    custom_questions: data.customQuestions,
+    custom_questions: data.customQuestions as unknown as Json,
     public_rules: data.publicRules || null,
     eligibility_summary: data.eligibilitySummary || null,
   });

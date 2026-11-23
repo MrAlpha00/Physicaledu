@@ -6,6 +6,7 @@ import type {
   Phase4DrawRow,
   Phase4EligibilityRow,
   Phase4EntryRow,
+  Phase4EntryStatus,
   Phase4EventRow,
   Phase4FileRow,
   Phase4InvitationRow,
@@ -130,7 +131,10 @@ export const getPublicSport = cache(async (
   return data ?? null;
 });
 
-export async function getEntries(competitionId: string, status?: string): Promise<EntryView[]> {
+export async function getEntries(
+  competitionId: string,
+  status?: Phase4EntryStatus,
+): Promise<EntryView[]> {
   const supabase = await createClient();
   let query = supabase.from("competition_entries").select("*").eq("competition_id", competitionId);
   if (status) query = query.eq("status", status);
