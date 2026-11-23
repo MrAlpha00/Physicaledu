@@ -121,13 +121,13 @@ export function AdminShell({
     <div className="flex h-full flex-col">
       <div className="border-b border-chalk/15 px-6 py-6">
         <Brand inverse href="/admin/dashboard" />
-        <p className="eyebrow mt-5 text-chalk/45">Administration</p>
+        <p className="eyebrow mt-5 text-chalk/60">Administration</p>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-5" aria-label="Admin navigation">
         {navigation.map((item) =>
           "children" in item && item.children ? (
             <div key={item.label}>
-              <p className="flex items-center gap-3 px-3 py-3 text-[0.68rem] font-extrabold uppercase tracking-[0.16em] text-chalk/45">
+              <p className="flex items-center gap-3 px-3 py-3 text-[0.68rem] font-extrabold uppercase tracking-[0.16em] text-chalk/60">
                 <item.icon className="size-4" />
                 {item.label}
               </p>
