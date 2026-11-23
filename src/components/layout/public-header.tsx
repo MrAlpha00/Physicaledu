@@ -18,6 +18,12 @@ export async function PublicHeader() {
             Events
           </Link>
           <Link
+            href="/games"
+            className="text-xs font-bold uppercase tracking-[0.14em] text-navy/70 transition-colors hover:text-navy"
+          >
+            Games
+          </Link>
+          <Link
             href="/#platform"
             className="text-xs font-bold uppercase tracking-[0.14em] text-navy/70 transition-colors hover:text-navy"
           >

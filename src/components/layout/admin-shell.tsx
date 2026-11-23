@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ClipboardList,
   DoorOpen,
+  Gamepad2,
   GraduationCap,
   LayoutDashboard,
   LogOut,
@@ -70,6 +71,15 @@ const navigation = [
     children: [
       { href: "/admin/events/dashboard", label: "Events dashboard" },
       { href: "/admin/events", label: "Events & competitions" },
+    ],
+  },
+  {
+    label: "Games (Phase 5)",
+    icon: Gamepad2,
+    children: [
+      { href: "/admin/games", label: "Game management" },
+      { href: "/admin/games/moderation", label: "Reports & moderation" },
+      { href: "/admin/games/ratings", label: "Rating adjustments" },
     ],
   },
   {

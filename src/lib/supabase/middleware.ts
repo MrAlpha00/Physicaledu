@@ -19,6 +19,12 @@ const PROTECTED_PREFIXES = [
   "/my-events",
   "/organizer",
   "/print",
+  "/games/dashboard",
+  "/games/challenges",
+  "/games/challenge",
+  "/games/history",
+  "/games/profile",
+  "/games/match",
 ];
 const GUEST_ONLY_PATHS = ["/login", "/register", "/forgot-password"];
 
