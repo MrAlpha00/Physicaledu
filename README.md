@@ -134,6 +134,12 @@ npm test           # Vitest unit tests
 | `/admin/announcements`, `/admin/notifications`, `/notifications` | Announcements, email queue and student inbox |
 | `/admin/sports-profiles`, `/my-sports-profile`, `/sports-profile/[student]` | Achievement verification and opt-in public profiles |
 | `/admin/reports`, `/print/reports`, `/api/admin/exports/phase3` | Reports, print view and XLSX/CSV exports |
+| `/admin/events`, `/admin/events/new`, `/admin/events/dashboard` | Event setup and live operations dashboard |
+| `/admin/events/[eventId]`, `/admin/events/[eventId]/sport/[sportId]/...` | Sport config, registrations, payments, organisers, draw, matches and results |
+| `/events`, `/events/[slug]`, `/events/[slug]/[sportSlug]`, `/results`, `/register` | Public events, brackets, results and registration |
+| `/my-events`, `/organizer`, `/organizer/invitations`, `/organizer/matches/[matchId]` | Participant entries and scoped organiser workspace |
+| `/api/phase4/exports`, `/print/phase4` | Phase 4 XLSX/CSV exports and print view |
+| `/api/phase4/files/[id]/download` | Authorised signed file/proof download |
 | `/api/webhooks/resend` | Signed Resend delivery webhook |
 | `/unauthorized` | Permission denied page |
 
