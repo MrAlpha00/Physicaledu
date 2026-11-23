@@ -269,8 +269,10 @@ src/
     time/              Asia/Kolkata boundaries and presets
     utils/             normalisation, formatting, import parsing, rate limiting
     validations/       centralised Zod schemas
+    tournament/        pure Phase 4 engine, graph, standings and scoring
+  components/phase4/   event controls and React Flow bracket canvas
   types/               database and view-model types
-supabase/migrations/   phase 1, 2 and 3 additive SQL migrations
+supabase/migrations/   phase 1, 2, 3 and 4 additive SQL migrations
 docs/                  setup, database, admin and phase documentation
 tests/                 unit tests for pure logic
 ```
@@ -279,11 +281,11 @@ Privileged database operations (registration and role assignment) use
 `SUPABASE_SECRET_KEY` only from server code. All ordinary reads and writes use
 the publishable key with RLS enforced.
 
-## Planned in Phases 4–6 (not implemented here)
+## Planned in Phases 5–6 (not implemented here)
 
-Multiplayer games, tournaments, team registration, payments, full analytics and
-PWA installation remain out of scope. Database and navigation design leave room
-for these modules, but no placeholder or fake working buttons have been added.
+Multiplayer games/game profiles (Phase 5) and PWA installation, final deployment
+and final audit (Phase 6) remain out of scope. No placeholder or fake working
+buttons were added for them; Phase 4's tournament canvas is fully functional.
 
 ## Deployment
 
