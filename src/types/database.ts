@@ -2367,6 +2367,10 @@ export interface Database {
       };
 
       /* Phase 5 RPCs */
+      phase3_log: {
+        Args: { p_action: string; p_entity_type: string; p_entity_id: string; p_details?: Json | null };
+        Returns: undefined;
+      };
       phase5_is_admin: { Args: Record<string, never>; Returns: boolean };
       phase5_is_match_participant: { Args: { p_match_id: string; p_user_id?: string }; Returns: boolean };
       phase5_game_enabled: { Args: { p_slug: string; p_mode?: string }; Returns: boolean };
