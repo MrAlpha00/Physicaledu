@@ -37,7 +37,7 @@ export interface PenaltyState {
   history: Array<PenaltyAttempt & { resolved: true }>;
 }
 
-export interface PenaltyConfig extends Record<string, Json> {
+export interface PenaltyConfig {
   attempts?: number;
   suddenDeath?: boolean;
 }

@@ -18,6 +18,8 @@ export const GAME_SLUGS = [
 
 export type GameSlug = (typeof GAME_SLUGS)[number];
 
+export type GameConfig = Record<string, Json>;
+
 export type MatchMode = "guest" | "practice" | "friendly" | "ranked";
 
 export const MODE_LABELS: Record<MatchMode, string> = {

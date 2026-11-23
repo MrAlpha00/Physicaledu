@@ -1,5 +1,5 @@
 /** Phase 5 — single source of truth for the six official VARSITY games. */
-import type { GameConfig, GameSlug } from "./types";
+import { GAME_SLUGS, type GameConfig, type GameSlug } from "./types";
 import type { Json } from "@/types/database";
 
 export interface GameDefinition {
