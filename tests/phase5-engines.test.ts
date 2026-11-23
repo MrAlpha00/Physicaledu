@@ -30,7 +30,7 @@ function playMoves<S extends { version: number; seq: number; status: string }>(
 
 describe("Phase 5 — pure game engines", () => {
   it("Tic-Tac-Toe detects a win, a draw, and rejects illegal moves", () => {
-    const state = ticTacToeEngine.create();
+    const state = ticTacToeEngine.create({});
     expect(findWinner(["X", "X", "X", null, null, null, null, null, null])?.mark).toBe("X");
 
     const won = playMoves(ticTacToeEngine as never, state as TicTacToeState, [
@@ -41,7 +41,7 @@ describe("Phase 5 — pure game engines", () => {
     expect(won.status).toBe("completed");
     expect(won.outcome).toMatchObject({ kind: "win", winner: 0 });
 
-    const drawn = playMoves(ticTacToeEngine as never, ticTacToeEngine.create(), [
+    const drawn = playMoves(ticTacToeEngine as never, ticTacToeEngine.create({}), [
       [0, "move", { cell: 0 }], [1, "move", { cell: 1 }],
       [0, "move", { cell: 2 }], [1, "move", { cell: 4 }],
       [0, "move", { cell: 3 }], [1, "move", { cell: 6 }],
@@ -58,7 +58,7 @@ describe("Phase 5 — pure game engines", () => {
   });
 
   it("Connect Four enforces gravity, column capacity and vertical wins", () => {
-    const empty = connectFourEngine.create();
+    const empty = connectFourEngine.create({});
     expect(landingRow(empty.board, 3)).toBe(0);
     const won = playMoves(connectFourEngine as never, empty, [
       [0, "drop", { column: 0 }], [1, "drop", { column: 1 }],
@@ -67,10 +67,10 @@ describe("Phase 5 — pure game engines", () => {
       [0, "drop", { column: 0 }],
     ]);
     expect(won.outcome).toMatchObject({ kind: "win", winner: 0 });
-    expect(landingRow(won.board, 0)).toBe(-1);
+    expect(landingRow(won.board, 0)).toBe(4);
 
-    const fullColumn = connectFourEngine.apply(won, action(1, won.seq + 1, "drop", { column: 0 }), {});
-    expect(fullColumn.accepted).toBe(false);
+    const afterFinish = connectFourEngine.apply(won, action(1, won.seq + 1, "drop", { column: 0 }), {});
+    expect(afterFinish.accepted).toBe(false);
   });
 
   it("Chess delegates legal moves and checkmate to chess.js and supports promotion", () => {
@@ -103,6 +103,12 @@ describe("Phase 5 — pure game engines", () => {
     expect(step.state.current.save).toBeNull();
     expect(step.state.status).toBe("active");
     step = penaltyEngine.apply(step.state, action(1, 2, "save", { direction: "right", height: "high" }), {});
+    expect(step.state.outcome).toBeNull();
+    expect(step.state.scores).toEqual([1, 0]);
+
+    step = penaltyEngine.apply(step.state, action(1, 3, "shoot", { direction: "center", height: "high", power: 60 }), {});
+    expect(step.accepted).toBe(true);
+    step = penaltyEngine.apply(step.state, action(0, 4, "save", { direction: "center", height: "high" }), {});
     expect(step.state.outcome).toMatchObject({ kind: "win", winner: 0 });
 
     const duplicate = penaltyEngine.apply(state, action(0, 1, "shoot", { direction: "center", height: "low", power: 60 }), {});
