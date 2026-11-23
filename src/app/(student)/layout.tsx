@@ -5,6 +5,9 @@ import { getUnreadNotificationCount } from "@/lib/data/phase3-notifications";
 
 export const dynamic = "force-dynamic";
 
+// Student workspaces are private and must never appear in search results.
+export const metadata = { robots: { index: false, follow: false } };
+
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const [profile, membership, unreadResult] = await Promise.all([

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import JSZip from "jszip";
+import { isCurrentUserPeAdmin } from "@/lib/auth/session";
 import { getAdminQrCodes } from "@/lib/data/qr";
 import { getSiteUrl } from "@/lib/env/public";
 import { buildQrDestination } from "@/lib/qr/qr-config";
@@ -14,6 +15,13 @@ function safeFilename(name: string): string {
 }
 
 export async function GET() {
+  if (!(await isCurrentUserPeAdmin())) {
+    return NextResponse.json(
+      { error: "PE Admin access required." },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const codes = (await getAdminQrCodes()).filter((qr) => qr.is_active);
   if (!codes.length) {
     return NextResponse.json({ error: "No active QR codes to download." }, { status: 404 });

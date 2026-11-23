@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isCurrentUserPeAdmin } from "@/lib/auth/session";
 import { getSiteUrl } from "@/lib/env/public";
 import { getAdminQrCode } from "@/lib/data/qr";
 import { buildQrDestination } from "@/lib/qr/qr-config";
@@ -15,6 +16,13 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (!(await isCurrentUserPeAdmin())) {
+    return NextResponse.json(
+      { error: "PE Admin access required." },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const qr = await getAdminQrCode((await params).id);
   if (!qr) {
     return NextResponse.json({ error: "QR code not found" }, { status: 404 });
