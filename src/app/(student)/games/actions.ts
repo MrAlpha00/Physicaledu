@@ -219,12 +219,16 @@ export async function submitMatchAction(publicId: string, raw: unknown): Promise
   const view = await getMatchByPublicId(publicId);
   if (!view) return { ok: false, error: "Match not found." };
   const envelope = toEnvelope(view);
+  const payload = jsonRecord(parsed.data.payload);
+  // Client clocks are never trusted: ranked chess time always comes from the server.
+  delete payload.now;
+  if (envelope.slug === "chess" && parsed.data.type === "move") payload.now = Date.now();
   const action = {
     seq: parsed.data.seq,
     expectedVersion: parsed.data.expectedVersion,
     actor: parsed.data.actor,
     type: parsed.data.type,
-    payload: jsonRecord(parsed.data.payload),
+    payload,
   };
 
   const result = applyAuthoritativeAction(envelope, action, { userId: user.id });
