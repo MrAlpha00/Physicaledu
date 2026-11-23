@@ -221,6 +221,16 @@ export function SportForm({
           ))}
         </div>
       </div>
+      {sport ? (
+        <Phase4FileUploadControl
+          name="imageFileId"
+          parentType="sport_image"
+          parentId={sport.id}
+          label="Public competition image"
+          visibility="public"
+          initialFileId={sport.image_file_id ?? ""}
+        />
+      ) : null}
       <div className="flex flex-wrap gap-6 border-t border-navy/10 pt-6">
         <label className="flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" name="isPublic" defaultChecked={sport?.is_public ?? true} className="size-4 accent-[#3564E9]" /> Public competition
