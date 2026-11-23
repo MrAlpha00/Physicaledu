@@ -103,7 +103,7 @@ export function TournamentCanvas({
   edges: CanvasEdge[];
 }) {
   const router = useRouter();
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes as FlowNode[]);
+  const [nodes, , onNodesChange] = useNodesState<FlowNode>(initialNodes as FlowNode[]);
   const [edgeList, , onEdgesChange] = useEdgesState<Edge>(initialEdges as Edge[]);
   const [notice, setNotice] = useState<ActionState | null>(null);
   const [pending, startTransition] = useTransition();

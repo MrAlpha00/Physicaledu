@@ -220,7 +220,7 @@ export async function correctResultAction(
   if (!parsed.success) return { status: "error", message: firstIssue(parsed.error) };
   if (!reason.trim()) return { status: "error", message: "A correction reason is required." };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("phase4_correct_match_result", {
+  const { error } = await supabase.rpc("phase4_correct_match_result", {
     p_match_id: matchId,
     p_result: {
       scoreA: parsed.data.scoreA ? Number(parsed.data.scoreA) : null,
