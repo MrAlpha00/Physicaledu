@@ -175,6 +175,30 @@ export function DrawControl({
   );
 }
 
+export function RemoveEligibilityButton({
+  ruleId,
+  competitionId,
+}: {
+  ruleId: string;
+  competitionId: string;
+}) {
+  const { notice, pending, run } = useActionFeedback();
+  return (
+    <div className="space-y-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        onClick={() => run(() => removeEligibilityRule(ruleId, competitionId))}
+      >
+        {pending ? "Removing…" : "Remove"}
+      </Button>
+      <Phase4ActionNotice state={notice} />
+    </div>
+  );
+}
+
 export function ReviewEntryForm({ entry }: { entry: Phase4EntryRow }) {
   const { notice, pending, run } = useActionFeedback();
   return (
