@@ -48,7 +48,3 @@ export function seededUnit(...values: Array<number | string>): number {
 export function advance<S extends BaseState>(state: S, patch: Partial<S> = {}): S {
   return { ...state, ...patch, version: state.version + 1, seq: state.seq + 1 };
 }
-
-export function actionEvent(type: string, message: string): never[] {
-  return [] as never[];
-}
