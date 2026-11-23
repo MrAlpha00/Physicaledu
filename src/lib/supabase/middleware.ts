@@ -16,6 +16,8 @@ const PROTECTED_PREFIXES = [
   "/my-feedback",
   "/notifications",
   "/my-sports-profile",
+  "/my-events",
+  "/organizer",
   "/print",
 ];
 const GUEST_ONLY_PATHS = ["/login", "/register", "/forgot-password"];

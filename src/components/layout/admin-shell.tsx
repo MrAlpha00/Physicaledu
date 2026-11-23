@@ -14,6 +14,7 @@ import {
   Megaphone,
   Menu,
   QrCode,
+  Trophy,
   UserRoundCheck,
   UsersRound,
   Wrench,
@@ -61,6 +62,14 @@ const navigation = [
       { href: "/admin/game-rules", label: "Game rules CMS" },
       { href: "/admin/sports-profiles", label: "Sports profiles" },
       { href: "/admin/reports", label: "Reports & exports" },
+    ],
+  },
+  {
+    label: "Sports (Phase 4)",
+    icon: Trophy,
+    children: [
+      { href: "/admin/events/dashboard", label: "Events dashboard" },
+      { href: "/admin/events", label: "Events & competitions" },
     ],
   },
   {

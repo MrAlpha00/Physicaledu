@@ -7,6 +7,7 @@ import {
   BookOpenCheck,
   CalendarCheck,
   CalendarDays,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   MessageSquareText,

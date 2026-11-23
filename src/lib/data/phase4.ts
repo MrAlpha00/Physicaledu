@@ -174,6 +174,38 @@ export async function getMyEntries(userId: string): Promise<EntryView[]> {
   }));
 }
 
+/** Payload for "my events": sport/event labels plus payment instructions for each entry. */
+export async function getEntryContexts(entries: EntryView[]): Promise<Map<string, {
+  sport: Phase4SportRow;
+  event: Phase4EventRow;
+  payment: Phase4PaymentSettingsRow | null;
+}>> {
+  const result = new Map<string, { sport: Phase4SportRow; event: Phase4EventRow; payment: Phase4PaymentSettingsRow | null }>();
+  if (!entries.length) return result;
+  const supabase = await createClient();
+  const competitionIds = [...new Set(entries.map((entry) => entry.competition_id))];
+  const [{ data: sports }, { data: payments }] = await Promise.all([
+    supabase.from("event_sports").select("*").in("id", competitionIds),
+    supabase.from("competition_payment_settings").select("*").in("competition_id", competitionIds),
+  ]);
+  const eventIds = [...new Set((sports ?? []).map((sport) => sport.event_id))];
+  const { data: events } = eventIds.length
+    ? await supabase.from("sports_events").select("*").in("id", eventIds)
+    : { data: [] };
+  for (const entry of entries) {
+    const sport = (sports ?? []).find((item) => item.id === entry.competition_id);
+    if (!sport) continue;
+    const event = (events ?? []).find((item) => item.id === sport.event_id);
+    if (!event) continue;
+    result.set(entry.id, {
+      sport,
+      event,
+      payment: (payments ?? []).find((item) => item.competition_id === sport.id) ?? null,
+    });
+  }
+  return result;
+}
+
 export async function getEntryDetail(entryId: string): Promise<{
   entry: Phase4EntryRow;
   members: Phase4MemberRow[];
