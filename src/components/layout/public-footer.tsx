@@ -39,7 +39,7 @@ export function PublicFooter() {
         </div>
       </div>
       <div className="border-t border-chalk/10">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-[0.7rem] uppercase tracking-[0.12em] text-chalk/45 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-[0.7rem] uppercase tracking-[0.12em] text-chalk/60 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <span>College Physical Education Department</span>
           <span>VARSITY — Athletic Digital Experience</span>
         </div>
