@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveSport } from "@/app/(admin)/admin/events/actions";
 import { Phase4ActionNotice } from "@/components/phase4/action-notice";
+import { Phase4FileUploadControl } from "@/components/phase4/file-upload-control";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,6 +75,7 @@ export function SportForm({
         autoAdvance: formData.get("autoAdvance") === "on",
         organizerResultsRequireApproval: formData.get("organizerResultsRequireApproval") === "on",
         publicRules: String(formData.get("publicRules") ?? ""),
+        imageFileId: String(formData.get("imageFileId") ?? "") || null,
       });
       setNotice(result);
       if (result.status === "success") {
