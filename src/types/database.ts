@@ -142,6 +142,317 @@ export type Phase3ParentType =
   | "announcement_attachment"
   | "sports_profile_photo";
 
+/* ------------------------------- Phase 4 -------------------------------- */
+
+export type Phase4EventStatus =
+  | "draft" | "published" | "registration_open" | "registration_closed"
+  | "ongoing" | "completed" | "archived";
+export type Phase4EntryStatus =
+  | "draft" | "submitted" | "under_review" | "approved" | "rejected"
+  | "waitlisted" | "withdrawn";
+export type Phase4PaymentStatus =
+  | "not_required" | "pending_verification" | "verified" | "rejected"
+  | "waived" | "refunded";
+export type Phase4MatchStatus =
+  | "scheduled" | "ready" | "ongoing" | "result_submitted" | "completed"
+  | "postponed" | "cancelled" | "disputed";
+
+export type Phase4EventRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  banner_file_id: string | null;
+  logo_file_id: string | null;
+  academic_year: string;
+  starts_on: string | null;
+  ends_on: string | null;
+  registration_opens_at: string | null;
+  registration_closes_at: string | null;
+  venue: string | null;
+  instructions: string | null;
+  contact_information: string | null;
+  is_public: boolean;
+  status: Phase4EventStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4SportRow = {
+  id: string;
+  event_id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  image_file_id: string | null;
+  category: string | null;
+  mode: "team" | "individual";
+  venue: string | null;
+  registration_start: string | null;
+  registration_deadline: string | null;
+  competition_date: string | null;
+  max_entries: number | null;
+  is_public: boolean;
+  status: Phase4EventStatus;
+  scoring_mode: "simple" | "sets" | "time" | "manual";
+  tournament_format: "knockout" | "round_robin" | "group_knockout";
+  draw_mode: "random" | "seeded" | "manual";
+  third_place: boolean;
+  group_count: number | null;
+  qualifiers_per_group: number | null;
+  legs: number;
+  points: Json;
+  auto_advance: boolean;
+  organizer_results_require_approval: boolean;
+  draw_locked: boolean;
+  started_at: string | null;
+  registration_rule_snapshot: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4RulesRow = {
+  id: string;
+  competition_id: string;
+  team_name_required: boolean;
+  min_team_size: number | null;
+  max_team_size: number | null;
+  team_limit: number | null;
+  captain_required: boolean;
+  substitute_allowance: number;
+  allow_multiple_competitions: boolean;
+  allow_duplicate_player_other_team: boolean;
+  require_member_confirmation: boolean;
+  require_manual_identity_verification: boolean;
+  required_participant_fields: string[];
+  custom_questions: Json;
+  public_rules: string | null;
+  eligibility_summary: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4EligibilityRow = {
+  id: string;
+  competition_id: string;
+  rule_type: "department" | "semester" | "academic_year" | "min_weight" | "max_weight" | "custom";
+  rule_value: Json;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4EntryRow = {
+  id: string;
+  competition_id: string;
+  kind: "team" | "individual";
+  team_name: string | null;
+  captain_user_id: string | null;
+  captain_directory_id: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  status: Phase4EntryStatus;
+  payment_status: Phase4PaymentStatus;
+  seed: number | null;
+  rules_snapshot: Json;
+  answers: Json;
+  metadata: Json;
+  rejection_reason: string | null;
+  correction_note: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4MemberRow = {
+  id: string;
+  entry_id: string;
+  student_directory_id: string;
+  user_id: string | null;
+  full_name: string;
+  usn: string;
+  department_id: string | null;
+  semester: number | null;
+  academic_year: number | null;
+  weight_kg: number | null;
+  is_captain: boolean;
+  is_substitute: boolean;
+  confirmation_status: "pending" | "accepted" | "declined" | "verified";
+  confirmed_at: string | null;
+  verified_by: string | null;
+  verified_at: string | null;
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4PaymentSettingsRow = {
+  id: string;
+  competition_id: string;
+  is_required: boolean;
+  fee_amount: number | null;
+  payment_unit: "team" | "participant";
+  instructions: string | null;
+  qr_file_id: string | null;
+  payment_deadline: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4PaymentRecordRow = {
+  id: string;
+  entry_id: string;
+  proof_file_id: string | null;
+  transaction_reference: string | null;
+  claimed_amount: number | null;
+  status: Phase4PaymentStatus;
+  note: string | null;
+  verified_by: string | null;
+  verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4DrawRow = {
+  id: string;
+  competition_id: string;
+  format: "knockout" | "round_robin" | "group_knockout";
+  draw_mode: "random" | "seeded" | "manual";
+  draw_seed: number;
+  version: number;
+  status: "draft" | "active" | "locked" | "archived";
+  payload: Json;
+  generated_by: string | null;
+  generated_at: string;
+  locked_at: string | null;
+  locked_by: string | null;
+  lock_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4MatchRow = {
+  id: string;
+  draw_id: string;
+  stage_id: string | null;
+  group_id: string | null;
+  round_key: string;
+  round_name: string;
+  round_number: number;
+  match_number: number;
+  status: Phase4MatchStatus;
+  starts_at: string | null;
+  ends_at: string | null;
+  venue: string | null;
+  organizer_id: string | null;
+  winner_entry_id: string | null;
+  is_bye: boolean;
+  notes: string | null;
+  calendar_event_id: string | null;
+  locked: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4SlotRow = {
+  match_id: string;
+  slot: "a" | "b";
+  entry_id: string | null;
+  participant_id: string | null;
+  source_match_id: string | null;
+  from_bye: boolean;
+};
+
+export type Phase4ResultRow = {
+  id: string;
+  match_id: string;
+  score_a: number | null;
+  score_b: number | null;
+  breakdown: Json;
+  winner_entry_id: string | null;
+  result_note: string | null;
+  submitted_by: string | null;
+  submitted_at: string;
+  is_authoritative: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Phase4StandingRow = {
+  id: string;
+  draw_id: string;
+  group_id: string | null;
+  group_key: string;
+  entry_id: string;
+  position: number;
+  played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  points_for: number;
+  points_against: number;
+  point_difference: number;
+  competition_points: number;
+  qualified: boolean;
+  updated_at: string;
+};
+
+export type Phase4AssignmentRow = {
+  id: string;
+  competition_id: string;
+  user_id: string;
+  student_directory_id: string | null;
+  assigned_by: string | null;
+  status: "active" | "revoked";
+  can_submit_results: boolean;
+  created_at: string;
+  revoked_at: string | null;
+};
+
+export type Phase4InvitationRow = {
+  id: string;
+  competition_id: string;
+  student_directory_id: string;
+  token_hash: string;
+  assigned_by: string | null;
+  expires_at: string;
+  accepted_at: string | null;
+  accepted_by: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
+export type Phase4FileRow = {
+  id: string;
+  object_key: string;
+  bucket: string;
+  original_filename: string;
+  content_type: string;
+  byte_size: number;
+  uploader_id: string | null;
+  parent_type: "event_banner" | "event_logo" | "sport_image" | "payment_qr" | "payment_proof" | "team_document" | "participant_document";
+  parent_id: string;
+  visibility: "private" | "public";
+  upload_status: "pending" | "confirmed" | "failed";
+  sha256: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type Phase4Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
+  Row: Row;
+  Insert: Insert;
+  Update: Update;
+  Relationships: [];
+};
+
 type Phase3Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -1165,6 +1476,120 @@ export interface Database {
       sports_profile_details: Phase3Table<Phase3SportsProfileRow>;
       sports_achievements: Phase3Table<Phase3AchievementRow>;
       sports_participation_records: Phase3Table<Phase3ParticipationRow>;
+
+      /* Phase 4 — events and tournaments */
+      phase4_files: Phase4Table<Phase4FileRow>;
+      sports_events: Phase4Table<Phase4EventRow>;
+      event_sports: Phase4Table<Phase4SportRow>;
+      competition_rules: Phase4Table<Phase4RulesRow>;
+      competition_eligibility_rules: Phase4Table<Phase4EligibilityRow>;
+      competition_entries: Phase4Table<Phase4EntryRow>;
+      competition_entry_members: Phase4Table<Phase4MemberRow>;
+      registration_history: Phase4Table<{
+        id: number;
+        entry_id: string;
+        actor_id: string | null;
+        action: string;
+        from_status: string | null;
+        to_status: string | null;
+        details: Json;
+        created_at: string;
+      }>;
+      participant_invitations: Phase4Table<{
+        id: string;
+        entry_id: string;
+        member_id: string;
+        token_hash: string;
+        expires_at: string;
+        accepted_at: string | null;
+        revoked_at: string | null;
+        created_at: string;
+      }>;
+      competition_payment_settings: Phase4Table<Phase4PaymentSettingsRow>;
+      competition_payment_records: Phase4Table<Phase4PaymentRecordRow>;
+      payment_verification_history: Phase4Table<{
+        id: number;
+        payment_id: string;
+        actor_id: string | null;
+        action: string;
+        from_status: string | null;
+        to_status: string | null;
+        note: string | null;
+        created_at: string;
+      }>;
+      tournament_draws: Phase4Table<Phase4DrawRow>;
+      tournament_stages: Phase4Table<{
+        id: string;
+        draw_id: string;
+        stage_key: string;
+        name: string;
+        stage_type: "group" | "league" | "knockout" | "third_place";
+        sequence: number;
+        created_at: string;
+      }>;
+      tournament_groups: Phase4Table<{
+        id: string;
+        stage_id: string;
+        group_key: string;
+        name: string;
+        sort_order: number;
+        created_at: string;
+      }>;
+      tournament_participants: Phase4Table<{
+        id: string;
+        draw_id: string;
+        entry_id: string | null;
+        group_id: string | null;
+        placeholder_key: string | null;
+        seed: number | null;
+        status: "active" | "qualified" | "eliminated" | "withdrawn";
+        created_at: string;
+      }>;
+      tournament_matches: Phase4Table<Phase4MatchRow>;
+      tournament_match_slots: Phase4Table<Phase4SlotRow>;
+      tournament_match_results: Phase4Table<Phase4ResultRow>;
+      tournament_match_result_history: Phase4Table<{
+        id: number;
+        match_id: string;
+        result_id: string | null;
+        actor_id: string | null;
+        action: string;
+        details: Json;
+        created_at: string;
+      }>;
+      tournament_standings: Phase4Table<Phase4StandingRow>;
+      tournament_graph_edges: Phase4Table<{
+        id: string;
+        draw_id: string;
+        source_match_id: string;
+        target_match_id: string;
+        target_slot: "a" | "b";
+        feed: "winner" | "loser";
+        created_at: string;
+      }>;
+      tournament_node_positions: Phase4Table<{
+        draw_id: string;
+        node_key: string;
+        position: Json;
+        updated_at: string;
+      }>;
+      sport_organizer_assignments: Phase4Table<Phase4AssignmentRow>;
+      organizer_invitations: Phase4Table<Phase4InvitationRow>;
+      organizer_activity_logs: Phase4Table<{
+        id: number;
+        competition_id: string;
+        user_id: string | null;
+        match_id: string | null;
+        action: string;
+        details: Json;
+        created_at: string;
+      }>;
+      phase4_calendar_links: Phase4Table<{
+        source_type: "event" | "match";
+        source_id: string;
+        calendar_event_id: string;
+        created_at: string;
+      }>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -1563,6 +1988,92 @@ export interface Database {
           preferred_sports: string[];
           sports_interests: string[];
           achievements: Json;
+        }>;
+      };
+
+      /* Phase 4 RPCs */
+      phase3_notify_user: {
+        Args: {
+          p_user_id: string;
+          p_title: string;
+          p_body: string;
+          p_category?: string;
+          p_link?: string | null;
+          p_priority?: string;
+          p_announcement_id?: string | null;
+        };
+        Returns: string | null;
+      };
+      phase4_validate_plan: { Args: { p_plan: Json }; Returns: string[] };
+      phase4_save_draw: {
+        Args: { p_competition_id: string; p_plan: Json; p_reason?: string | null };
+        Returns: Json;
+      };
+      phase4_save_node_positions: { Args: { p_draw_id: string; p_positions: Json }; Returns: number };
+      phase4_set_draw_lock: {
+        Args: { p_draw_id: string; p_locked: boolean; p_reason?: string | null };
+        Returns: undefined;
+      };
+      phase4_submit_match_result: {
+        Args: { p_match_id: string; p_result: Json; p_require_approval?: boolean };
+        Returns: Json;
+      };
+      phase4_correct_match_result: {
+        Args: { p_match_id: string; p_result: Json; p_reason: string };
+        Returns: Json;
+      };
+      phase4_admin_update_match: {
+        Args: { p_match_id: string; p_data: Json; p_reason?: string | null };
+        Returns: undefined;
+      };
+      phase4_create_organizer_invitation: {
+        Args: { p_competition_id: string; p_student_directory_id: string; p_expires_hours?: number };
+        Returns: Json;
+      };
+      phase4_accept_organizer_invitation: { Args: { p_token: string }; Returns: Json };
+      phase4_revoke_organizer_assignment: {
+        Args: { p_assignment_id: string; p_reason?: string | null };
+        Returns: undefined;
+      };
+      phase4_revoke_organizer_invitation: {
+        Args: { p_invitation_id: string; p_reason?: string | null };
+        Returns: undefined;
+      };
+      phase4_submit_entry: { Args: { p_competition_id: string; p_payload: Json }; Returns: Json };
+      phase4_review_entry: {
+        Args: { p_entry_id: string; p_status: string; p_note?: string | null };
+        Returns: Json;
+      };
+      phase4_verify_payment: {
+        Args: { p_payment_id: string; p_status: string; p_note?: string | null };
+        Returns: Json;
+      };
+      phase4_respond_participant_invitation: {
+        Args: { p_token: string; p_accept: boolean };
+        Returns: Json;
+      };
+      phase4_authorize_upload: {
+        Args: {
+          p_parent_type: string;
+          p_parent_id: string;
+          p_original_filename: string;
+          p_content_type: string;
+          p_byte_size: number;
+          p_visibility?: string;
+        };
+        Returns: Json;
+      };
+      phase4_confirm_upload: {
+        Args: { p_file_id: string; p_verified_size: number; p_verified_content_type?: string | null };
+        Returns: Json;
+      };
+      phase4_authorize_download: {
+        Args: { p_file_id: string };
+        Returns: Array<{
+          object_key: string;
+          content_type: string;
+          original_filename: string;
+          byte_size: number;
         }>;
       };
     };

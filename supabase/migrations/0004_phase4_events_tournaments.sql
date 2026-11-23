@@ -1929,6 +1929,116 @@ grant execute on function public.phase4_can_view_file(uuid) to anon, authenticat
 alter publication supabase_realtime add table public.tournament_matches;
 alter publication supabase_realtime add table public.competition_entries;
 
+/* ------------------------------------------------------------------------- */
+/* R2 metadata RPCs — private objects, signed URLs only                       */
+/* ------------------------------------------------------------------------- */
+
+create or replace function public.phase4_authorize_upload(
+  p_parent_type text, p_parent_id uuid, p_original_filename text,
+  p_content_type text, p_byte_size bigint, p_visibility text default 'private'
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_admin boolean := public.phase4_is_admin();
+  v_extension text;
+  v_key text;
+  v_file_id uuid;
+  v_object_visibility text := 'private';
+begin
+  if auth.uid() is null then raise exception 'Sign in to upload files.'; end if;
+  if p_parent_type not in (
+    'event_banner', 'event_logo', 'sport_image', 'payment_qr',
+    'payment_proof', 'team_document', 'participant_document') then
+    raise exception 'Unsupported file category';
+  end if;
+  if p_byte_size is null or p_byte_size <= 0 or p_byte_size > 10485760 then
+    raise exception 'Files must be between 1 byte and 10 MB.';
+  end if;
+  if p_content_type not in ('image/png', 'image/jpeg', 'image/webp', 'application/pdf') then
+    raise exception 'Only PNG, JPEG, WebP and PDF files are accepted.';
+  end if;
+
+  v_extension := lower(substring(btrim(p_original_filename) from '\.([a-z0-9]{2,5})$'));
+  if v_extension is null then
+    v_extension := case p_content_type
+      when 'image/png' then 'png' when 'image/jpeg' then 'jpg'
+      when 'image/webp' then 'webp' else 'pdf' end;
+  end if;
+
+  if p_parent_type in ('event_banner', 'event_logo', 'sport_image', 'payment_qr') then
+    if not v_admin then raise exception 'Only PE Admin can upload this file category.'; end if;
+    if not exists (select 1 from public.event_sports where id = p_parent_id)
+       and not exists (select 1 from public.sports_events where id = p_parent_id) then
+      raise exception 'Upload target not found';
+    end if;
+    v_object_visibility := 'public';
+  else
+    if not public.phase4_owns_entry(p_parent_id) and not v_admin then
+      raise exception 'You cannot upload a document for this entry.';
+    end if;
+    if p_parent_type = 'payment_proof' then v_object_visibility := 'private'; end if;
+  end if;
+
+  v_key := 'phase4/' || p_parent_type || '/' || p_parent_id::text || '/'
+    || gen_random_uuid()::text || '.' || v_extension;
+  insert into public.phase4_files (
+    object_key, original_filename, content_type, byte_size, uploader_id,
+    parent_type, parent_id, visibility, upload_status
+  ) values (
+    v_key, left(btrim(p_original_filename), 200), p_content_type, p_byte_size,
+    auth.uid(), p_parent_type, p_parent_id, v_object_visibility, 'pending'
+  ) returning id into v_file_id;
+
+  return jsonb_build_object('fileId', v_file_id, 'objectKey', v_key);
+end;
+$$;
+
+create or replace function public.phase4_confirm_upload(
+  p_file_id uuid, p_verified_size bigint, p_verified_content_type text default null
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_file public.phase4_files%rowtype;
+begin
+  select * into v_file from public.phase4_files where id = p_file_id for update;
+  if not found then raise exception 'File record not found'; end if;
+  if v_file.uploader_id <> auth.uid() and not public.phase4_is_admin() then
+    raise exception 'You cannot confirm this upload.';
+  end if;
+  if p_verified_size is null or p_verified_size <= 0 or p_verified_size > v_file.byte_size then
+    raise exception 'Uploaded object size does not match the authorised upload.';
+  end if;
+  update public.phase4_files
+  set upload_status = 'confirmed',
+      content_type = coalesce(p_verified_content_type, content_type),
+      byte_size = p_verified_size, updated_at = now()
+  where id = p_file_id;
+  return jsonb_build_object('fileId', p_file_id, 'status', 'confirmed');
+end;
+$$;
+
+create or replace function public.phase4_authorize_download(p_file_id uuid)
+returns table (
+  object_key text, content_type text, original_filename text, byte_size bigint
+) language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if not exists (
+    select 1 from public.phase4_files f
+    where f.id = p_file_id and f.upload_status = 'confirmed'
+      and (public.phase4_can_view_file(f.id) or f.uploader_id = auth.uid())
+  ) then raise exception 'File not available'; end if;
+
+  return query
+    select f.object_key, f.content_type, f.original_filename, f.byte_size
+    from public.phase4_files f where f.id = p_file_id;
+end;
+$$;
+
+revoke all on function public.phase4_authorize_upload(text, uuid, text, text, bigint, text) from public;
+revoke all on function public.phase4_confirm_upload(uuid, bigint, text) from public;
+revoke all on function public.phase4_authorize_download(uuid) from public;
+grant execute on function public.phase4_authorize_upload(text, uuid, text, text, bigint, text) to authenticated;
+grant execute on function public.phase4_confirm_upload(uuid, bigint, text) to authenticated;
+grant execute on function public.phase4_authorize_download(uuid) to authenticated, anon;
+
 comment on table public.sports_events is 'Phase 4 event container; RLS scoped to PE Admin, assigned organisers and public visibility.';
 comment on table public.tournament_draws is 'Authoritative tournament generation version; the React Flow canvas is a projection of this data.';
 comment on table public.competition_payment_records is 'Private payment proofs; never exposed to organisers or public pages.';
