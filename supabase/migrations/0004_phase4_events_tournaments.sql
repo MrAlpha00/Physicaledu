@@ -1099,27 +1099,6 @@ begin
   end loop;
 
   -- Resolve winner-source references after all matches exist.
-  update public.tournament_match_slots s
-  set source_match_id = (v_match_map ->> s.source_key)::uuid
-  from (
-    select sm.id as slot_id, sm.source_match_id::text as source_key
-    from public.tournament_match_slots sm
-    join public.tournament_matches m on m.id = sm.match_id
-    where m.draw_id = v_draw_id and sm.source_match_id is null
-  ) s
-  where s.slot_id is null; -- placeholder: handled below with explicit loop
-
-  for v_slot in
-    select sm.id as slot_id, sm.source_match_id::text as source_key
-    from public.tournament_match_slots sm
-    join public.tournament_matches m on m.id = sm.match_id
-    where m.draw_id = v_draw_id and sm.source_match_id is null
-  loop
-    -- Keys that were not UUIDs are stored temporarily in the payload mapping;
-    -- remap any textual key that reached this column through the insert above.
-    null;
-  end loop;
-
   for v_edge in select value from jsonb_array_elements(coalesce(p_plan->'edges', '[]'::jsonb)) loop
     v_source_match_id := (v_match_map ->> (v_edge.value->>'sourceMatchKey'))::uuid;
     v_target_match_id := (v_match_map ->> (v_edge.value->>'targetMatchKey'))::uuid;
@@ -1232,7 +1211,552 @@ begin
 end;
 $$;
 
--- __PHASE4_PART5__
+create or replace function public.phase4_submit_match_result(
+  p_match_id uuid, p_result jsonb, p_require_approval boolean default false
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_match public.tournament_matches%rowtype;
+  v_competition public.event_sports%rowtype;
+  v_winner uuid;
+  v_slot_a uuid;
+  v_slot_b uuid;
+  v_result_id uuid;
+  v_advanced integer := 0;
+  v_notify uuid[];
+  v_edge record;
+  v_is_admin boolean := public.phase4_is_admin();
+begin
+  select * into v_match from public.tournament_matches where id = p_match_id for update;
+  if not found then raise exception 'Match not found'; end if;
+  if v_match.is_bye then raise exception 'Bye matches have no result to submit.'; end if;
+  if v_match.status in ('completed', 'cancelled') then
+    raise exception 'This match result is already finalised.';
+  end if;
+  if exists (select 1 from public.tournament_match_results r where r.match_id = p_match_id) then
+    raise exception 'Use an audited correction to change a submitted result.';
+  end if;
+
+  select s into v_competition from public.event_sports s
+  join public.tournament_draws d on d.competition_id = s.id
+  where d.id = v_match.draw_id;
+
+  if not v_is_admin then
+    if not public.phase4_has_sport_access(v_competition.id) then
+      raise exception 'You are not assigned to this sport.';
+    end if;
+    if not exists (
+      select 1 from public.sport_organizer_assignments a
+      where a.competition_id = v_competition.id and a.user_id = auth.uid()
+        and a.status = 'active' and a.can_submit_results) then
+      raise exception 'Result submission is not permitted for this assignment.';
+    end if;
+    if v_match.organizer_id is not null and v_match.organizer_id <> auth.uid() then
+      raise exception 'This match is assigned to another organiser.';
+    end if;
+  end if;
+
+  select s.entry_id into v_slot_a from public.tournament_match_slots s where s.match_id = p_match_id and s.slot = 'a';
+  select s.entry_id into v_slot_b from public.tournament_match_slots s where s.match_id = p_match_id and s.slot = 'b';
+  v_winner := nullif(p_result->>'winnerEntryId', '')::uuid;
+  if v_winner is null or v_winner not in (v_slot_a, v_slot_b) then
+    raise exception 'The selected winner is not part of this match.';
+  end if;
+
+  insert into public.tournament_match_results (
+    match_id, score_a, score_b, breakdown, winner_entry_id, result_note,
+    submitted_by, is_authoritative
+  ) values (
+    p_match_id,
+    nullif(p_result->>'scoreA', '')::numeric,
+    nullif(p_result->>'scoreB', '')::numeric,
+    coalesce(p_result->'breakdown', '[]'::jsonb),
+    v_winner,
+    nullif(p_result->>'notes', ''),
+    auth.uid(),
+    not p_require_approval
+  ) returning id into v_result_id;
+
+  update public.tournament_matches
+  set status = case when p_require_approval then 'result_submitted' else 'completed' end,
+      winner_entry_id = v_winner, updated_at = now()
+  where id = p_match_id;
+
+  insert into public.tournament_match_result_history (match_id, result_id, actor_id, action, details)
+  values (p_match_id, v_result_id, auth.uid(), 'submitted', p_result);
+
+  if not p_require_approval then
+    for v_edge in
+      select e.* from public.tournament_graph_edges e
+      where e.source_match_id = p_match_id and e.feed = 'winner'
+    loop
+      update public.tournament_match_slots s
+      set entry_id = v_winner,
+          participant_id = (select id from public.tournament_participants
+                            where draw_id = v_match.draw_id and entry_id = v_winner),
+          from_bye = false
+      where s.match_id = v_edge.target_match_id and s.slot = v_edge.target_slot;
+      v_advanced := v_advanced + 1;
+    end loop;
+
+    update public.tournament_participants
+    set status = 'qualified'
+    where draw_id = v_match.draw_id and entry_id = v_winner and status = 'active';
+
+    if v_competition.tournament_format in ('round_robin', 'group_knockout') then
+      update public.tournament_standings st
+      set played = st.played + 1,
+          wins = st.wins + case when st.entry_id = v_winner then 1 else 0 end,
+          losses = st.losses + case when st.entry_id = v_winner then 0 else 1 end,
+          points_for = st.points_for + case when st.entry_id = v_winner
+            then coalesce(nullif(p_result->>'scoreA', '')::numeric, 0)
+            else coalesce(nullif(p_result->>'scoreB', '')::numeric, 0) end,
+          points_against = st.points_against + case when st.entry_id = v_winner
+            then coalesce(nullif(p_result->>'scoreB', '')::numeric, 0)
+            else coalesce(nullif(p_result->>'scoreA', '')::numeric, 0) end,
+          updated_at = now()
+      where st.draw_id = v_match.draw_id
+        and st.entry_id in (v_slot_a, v_slot_b)
+        and (v_match.group_id is null or st.group_id = v_match.group_id);
+
+      update public.tournament_standings st
+      set competition_points = st.wins * coalesce((v_competition.points->>'win')::numeric, 3)
+            + st.draws * coalesce((v_competition.points->>'draw')::numeric, 1)
+            + st.losses * coalesce((v_competition.points->>'loss')::numeric, 0),
+          point_difference = st.points_for - st.points_against,
+          updated_at = now()
+      where st.draw_id = v_match.draw_id and st.entry_id in (v_slot_a, v_slot_b);
+    end if;
+  end if;
+
+  select coalesce(array_agg(distinct e.captain_user_id), '{}'::uuid[]) into v_notify
+  from public.competition_entries e
+  where e.id in (v_slot_a, v_slot_b) and e.captain_user_id is not null;
+  perform public.phase4_notify_users(
+    v_notify, 'Match result submitted',
+    'A result was submitted for match ' || v_match.match_number || '.',
+    'future_event', '/events');
+
+  if not v_is_admin then
+    insert into public.organizer_activity_logs (competition_id, user_id, match_id, action, details)
+    values (v_competition.id, auth.uid(), p_match_id, 'result_submitted',
+      jsonb_build_object('resultId', v_result_id, 'winnerEntryId', v_winner));
+  end if;
+
+  return jsonb_build_object(
+    'resultId', v_result_id, 'winnerEntryId', v_winner,
+    'advanced', v_advanced, 'status', v_match.status
+  );
+end;
+$$;
+
+create or replace function public.phase4_correct_match_result(
+  p_match_id uuid, p_result jsonb, p_reason text
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_match public.tournament_matches%rowtype;
+  v_old public.tournament_match_results%rowtype;
+  v_winner uuid;
+  v_result_id uuid;
+  v_edge record;
+  v_slot_a uuid;
+  v_slot_b uuid;
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  if coalesce(btrim(p_reason), '') = '' then raise exception 'A correction reason is required.'; end if;
+  select * into v_match from public.tournament_matches where id = p_match_id for update;
+  if not found then raise exception 'Match not found'; end if;
+  select * into v_old from public.tournament_match_results where match_id = p_match_id;
+  if found then
+    insert into public.tournament_match_result_history (match_id, result_id, actor_id, action, details)
+    values (p_match_id, v_old.id, auth.uid(), 'corrected',
+      jsonb_build_object('reason', p_reason, 'previous', to_jsonb(v_old)));
+  end if;
+
+  select s.entry_id into v_slot_a from public.tournament_match_slots s where s.match_id = p_match_id and s.slot = 'a';
+  select s.entry_id into v_slot_b from public.tournament_match_slots s where s.match_id = p_match_id and s.slot = 'b';
+  v_winner := nullif(p_result->>'winnerEntryId', '')::uuid;
+  if v_winner is null or v_winner not in (v_slot_a, v_slot_b) then
+    raise exception 'The selected winner is not part of this match.';
+  end if;
+
+  insert into public.tournament_match_results (
+    match_id, score_a, score_b, breakdown, winner_entry_id, result_note,
+    submitted_by, is_authoritative, approved_by, approved_at
+  ) values (
+    p_match_id, nullif(p_result->>'scoreA', '')::numeric,
+    nullif(p_result->>'scoreB', '')::numeric,
+    coalesce(p_result->'breakdown', '[]'::jsonb), v_winner,
+    nullif(p_result->>'notes', ''), auth.uid(), true, auth.uid(), now()
+  ) on conflict (match_id) do update set
+    score_a = excluded.score_a, score_b = excluded.score_b,
+    breakdown = excluded.breakdown, winner_entry_id = excluded.winner_entry_id,
+    result_note = excluded.result_note, approved_by = excluded.approved_by,
+    approved_at = excluded.approved_at, updated_at = now()
+  returning id into v_result_id;
+
+  update public.tournament_matches
+  set status = 'completed', winner_entry_id = v_winner, updated_at = now()
+  where id = p_match_id;
+
+  for v_edge in
+    select e.* from public.tournament_graph_edges e where e.source_match_id = p_match_id and e.feed = 'winner'
+  loop
+    update public.tournament_match_slots s
+    set entry_id = v_winner,
+        participant_id = (select id from public.tournament_participants
+                          where draw_id = v_match.draw_id and entry_id = v_winner)
+    where s.match_id = v_edge.target_match_id and s.slot = v_edge.target_slot;
+  end loop;
+
+  perform public.phase3_log('match_result_corrected', 'tournament_matches', p_match_id::text,
+    jsonb_build_object('reason', p_reason, 'winner', v_winner));
+  return jsonb_build_object('resultId', v_result_id, 'winnerEntryId', v_winner, 'corrected', true);
+end;
+$$;
+
+create or replace function public.phase4_admin_update_match(
+  p_match_id uuid, p_data jsonb, p_reason text default null
+) returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_match public.tournament_matches%rowtype;
+  v_notify uuid[];
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  select * into v_match from public.tournament_matches where id = p_match_id;
+  if not found then raise exception 'Match not found'; end if;
+
+  update public.tournament_matches set
+    starts_at = case when p_data ? 'startsAt' then nullif(p_data->>'startsAt', '')::timestamptz else starts_at end,
+    ends_at = case when p_data ? 'endsAt' then nullif(p_data->>'endsAt', '')::timestamptz else ends_at end,
+    venue = case when p_data ? 'venue' then nullif(p_data->>'venue', '') else venue end,
+    status = case when p_data ? 'status' then p_data->>'status' else status end,
+    organizer_id = case when p_data ? 'organizerId' then nullif(p_data->>'organizerId', '')::uuid else organizer_id end,
+    notes = case when p_data ? 'notes' then nullif(p_data->>'notes', '') else notes end,
+    updated_at = now()
+  where id = p_match_id;
+
+  if p_data ? 'calendarEventId' then
+    insert into public.phase4_calendar_links (source_type, source_id, calendar_event_id)
+    values ('match', p_match_id, (p_data->>'calendarEventId')::uuid)
+    on conflict (source_type, source_id) do update set calendar_event_id = excluded.calendar_event_id;
+    update public.tournament_matches
+    set calendar_event_id = (p_data->>'calendarEventId')::uuid where id = p_match_id;
+  end if;
+
+  select coalesce(array_agg(distinct e.captain_user_id), '{}'::uuid[]) into v_notify
+  from public.competition_entries e
+  join public.tournament_match_slots s on s.entry_id = e.id
+  where s.match_id = p_match_id and e.captain_user_id is not null;
+  perform public.phase4_notify_users(
+    v_notify, 'Match schedule updated',
+    'Match ' || v_match.match_number || ' schedule was updated.',
+    'calendar', '/events');
+
+  perform public.phase3_log('match_admin_updated', 'tournament_matches', p_match_id::text,
+    coalesce(p_data, '{}'::jsonb) || jsonb_build_object('reason', p_reason));
+end;
+$$;
+
+create or replace function public.phase4_create_organizer_invitation(
+  p_competition_id uuid, p_student_directory_id uuid, p_expires_hours integer default 72
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_token text;
+  v_invitation_id uuid;
+  v_expires_at timestamptz;
+  v_directory public.student_directory%rowtype;
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  select * into v_directory from public.student_directory where id = p_student_directory_id and is_active;
+  if not found then raise exception 'The selected student is not in the active directory.'; end if;
+  if p_expires_hours is null or p_expires_hours not between 1 and 720 then
+    raise exception 'Invitation expiry must be between 1 and 720 hours.';
+  end if;
+
+  v_token := replace(replace(replace(encode(gen_random_bytes(32), 'base64'), '+', '-'), '/', '_'), '=', '');
+  v_expires_at := now() + make_interval(hours => p_expires_hours);
+
+  insert into public.organizer_invitations (
+    competition_id, student_directory_id, token_hash, assigned_by, expires_at
+  ) values (
+    p_competition_id, p_student_directory_id,
+    encode(digest(v_token, 'sha256'), 'hex'), auth.uid(), v_expires_at
+  ) returning id into v_invitation_id;
+
+  perform public.phase3_log('organizer_invitation_created', 'organizer_invitations', v_invitation_id::text,
+    jsonb_build_object('competitionId', p_competition_id, 'studentDirectoryId', p_student_directory_id));
+
+  return jsonb_build_object(
+    'invitationId', v_invitation_id, 'token', v_token,
+    'expiresAt', v_expires_at, 'studentName', v_directory.full_name
+  );
+end;
+$$;
+
+create or replace function public.phase4_accept_organizer_invitation(p_token text)
+returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_invitation public.organizer_invitations%rowtype;
+  v_directory_id uuid;
+  v_assignment_id uuid;
+begin
+  if p_token is null or btrim(p_token) = '' then raise exception 'Invalid invitation.'; end if;
+  select public.student_directory_id_for_user() into v_directory_id;
+  if v_directory_id is null then raise exception 'Your account is not linked to the student directory.'; end if;
+
+  select * into v_invitation from public.organizer_invitations
+  where token_hash = encode(digest(p_token, 'sha256'), 'hex')
+    for update;
+  if not found or v_invitation.accepted_at is not null or v_invitation.revoked_at is not null
+     or v_invitation.expires_at <= now() then
+    raise exception 'This invitation is invalid, expired or already used.';
+  end if;
+  if v_invitation.student_directory_id <> v_directory_id then
+    raise exception 'This invitation was issued to a different student.';
+  end if;
+
+  insert into public.sport_organizer_assignments (
+    competition_id, user_id, student_directory_id, assigned_by
+  ) values (
+    v_invitation.competition_id, auth.uid(), v_invitation.student_directory_id, v_invitation.assigned_by
+  ) on conflict (competition_id, user_id) do update set
+    status = 'active', revoked_at = null
+  returning id into v_assignment_id;
+
+  update public.organizer_invitations
+  set accepted_at = now(), accepted_by = auth.uid() where id = v_invitation.id;
+
+  insert into public.organizer_activity_logs (competition_id, user_id, action, details)
+  values (v_invitation.competition_id, auth.uid(), 'invitation_accepted',
+    jsonb_build_object('assignmentId', v_assignment_id));
+
+  return jsonb_build_object(
+    'assignmentId', v_assignment_id, 'competitionId', v_invitation.competition_id,
+    'status', 'active'
+  );
+end;
+$$;
+
+create or replace function public.phase4_revoke_organizer_assignment(
+  p_assignment_id uuid, p_reason text default null
+) returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_competition_id uuid;
+  v_user_id uuid;
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  update public.sport_organizer_assignments
+  set status = 'revoked', revoked_at = now()
+  where id = p_assignment_id and status = 'active'
+  returning competition_id, user_id into v_competition_id, v_user_id;
+  if v_competition_id is null then raise exception 'Assignment not found'; end if;
+  insert into public.organizer_activity_logs (competition_id, user_id, action, details)
+  values (v_competition_id, v_user_id, 'assignment_revoked', jsonb_build_object('reason', p_reason));
+  perform public.phase3_log('organizer_assignment_revoked', 'sport_organizer_assignments',
+    p_assignment_id::text, jsonb_build_object('reason', p_reason));
+end;
+$$;
+
+create or replace function public.phase4_revoke_organizer_invitation(
+  p_invitation_id uuid, p_reason text default null
+) returns void language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  update public.organizer_invitations set revoked_at = now()
+  where id = p_invitation_id and accepted_at is null and revoked_at is null;
+  if not found then raise exception 'Invitation not found or already used'; end if;
+  perform public.phase3_log('organizer_invitation_revoked', 'organizer_invitations',
+    p_invitation_id::text, jsonb_build_object('reason', p_reason));
+end;
+$$;
+
+create or replace function public.phase4_submit_entry(
+  p_competition_id uuid, p_payload jsonb
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_competition public.event_sports%rowtype;
+  v_rules public.competition_rules%rowtype;
+  v_settings public.competition_payment_settings%rowtype;
+  v_profile public.profiles%rowtype;
+  v_member jsonb;
+  v_directory public.student_directory%rowtype;
+  v_entry_id uuid;
+  v_member_ids uuid[] := '{}';
+  v_usns text[] := '{}';
+  v_usn text;
+  v_count integer;
+  v_snapshot jsonb;
+  v_kind text;
+  v_captain_usn text;
+  v_eligibility jsonb;
+  v_rule jsonb;
+begin
+  if auth.uid() is null then raise exception 'Sign in to register.'; end if;
+  select * into v_competition from public.event_sports where id = p_competition_id;
+  if not found then raise exception 'Competition not found'; end if;
+  if v_competition.status <> 'registration_open' then
+    raise exception 'Registration is not open for this competition.';
+  end if;
+  if v_competition.registration_start is not null and now() < v_competition.registration_start then
+    raise exception 'Registration has not opened yet.';
+  end if;
+  if v_competition.registration_deadline is not null and now() > v_competition.registration_deadline then
+    raise exception 'The registration deadline has passed.';
+  end if;
+
+  select * into v_rules from public.competition_rules where competition_id = p_competition_id;
+  select * into v_settings from public.competition_payment_settings where competition_id = p_competition_id;
+  select * into v_profile from public.profiles where id = auth.uid();
+  if not found or v_profile.student_directory_id is null or v_profile.verification_status <> 'verified' then
+    raise exception 'A verified student account is required to register.';
+  end if;
+
+  v_kind := coalesce(p_payload->>'kind', v_competition.mode);
+  if v_kind not in ('team', 'individual') or v_kind <> v_competition.mode then
+    raise exception 'This competition does not accept that entry type.';
+  end if;
+  if jsonb_array_length(coalesce(p_payload->'members', '[]'::jsonb)) = 0 then
+    raise exception 'At least one participant is required.';
+  end if;
+  if v_kind = 'team' and coalesce(v_rules.captain_required, true)
+     and nullif(p_payload->>'captainUsn', '') is null then
+    raise exception 'A captain USN is required.';
+  end if;
+  if v_kind = 'team' and coalesce(v_rules.min_team_size, 1) > jsonb_array_length(p_payload->'members') then
+    raise exception 'The team is below the minimum size.';
+  end if;
+  if v_kind = 'team' and v_rules.max_team_size is not null
+     and jsonb_array_length(p_payload->'members') > v_rules.max_team_size then
+    raise exception 'The team exceeds the maximum size.';
+  end if;
+  if v_kind = 'individual' and jsonb_array_length(p_payload->'members') <> 1 then
+    raise exception 'An individual entry must contain exactly one competitor.';
+  end if;
+
+  v_captain_usn := upper(btrim(coalesce(p_payload->>'captainUsn', '')));
+  for v_member in select value from jsonb_array_elements(p_payload->'members') loop
+    v_usn := public.normalize_usn(coalesce(v_member->>'usn', ''));
+    if v_usn is null or v_usn = any(v_usns) then
+      raise exception 'Duplicate or invalid participant USN.';
+    end if;
+    v_usns := array_append(v_usns, v_usn);
+    select * into v_directory from public.student_directory
+    where usn = v_usn and is_active;
+    if not found then raise exception 'A participant USN is not in the official directory: %', v_usn; end if;
+    if v_captain_usn = '' and coalesce((v_member->>'isCaptain')::boolean, false) then
+      v_captain_usn := v_usn;
+    end if;
+
+    for v_rule in select value from public.competition_eligibility_rules
+      where competition_id = p_competition_id and is_active loop
+      if v_rule.value->>'rule_type' = 'department'
+         and not (v_directory.department_id::text = any(
+           array(select jsonb_array_elements_text(v_rule.value->'departments')))) then
+        raise exception 'A participant does not meet the department eligibility rule.';
+      end if;
+      if v_rule.value->>'rule_type' = 'semester'
+         and v_directory.semester < coalesce((v_rule.value->>'min')::smallint, 1) then
+        raise exception 'A participant does not meet the semester eligibility rule.';
+      end if;
+      if v_rule.value->>'rule_type' = 'academic_year'
+         and v_directory.academic_year < coalesce((v_rule.value->>'min')::smallint, 1) then
+        raise exception 'A participant does not meet the academic year rule.';
+      end if;
+      if v_rule.value->>'rule_type' = 'min_weight'
+         and coalesce((v_member->>'weightKg')::numeric, 0) < (v_rule.value->>'value')::numeric then
+        raise exception 'A participant is below the required weight.';
+      end if;
+      if v_rule.value->>'rule_type' = 'max_weight'
+         and coalesce((v_member->>'weightKg')::numeric, 0) > (v_rule.value->>'value')::numeric then
+        raise exception 'A participant exceeds the maximum weight.';
+      end if;
+    end loop;
+  end loop;
+
+  if v_captain_usn <> public.normalize_usn(v_profile.requested_usn)
+     and not exists (
+       select 1 from public.student_directory d
+       where d.id = v_profile.student_directory_id and d.usn = v_captain_usn) then
+    raise exception 'The captain must be the signed-in student.';
+  end if;
+
+  if v_competition.max_entries is not null then
+    select count(*) into v_count from public.competition_entries
+    where competition_id = p_competition_id and status <> 'withdrawn';
+    if v_count >= v_competition.max_entries then
+      raise exception 'This competition is full.';
+    end if;
+  end if;
+  if not v_rules.allow_duplicate_player_other_team then
+    if exists (
+      select 1 from public.competition_entry_members m
+      join public.competition_entries e on e.id = m.entry_id
+      where e.competition_id = p_competition_id and e.status <> 'withdrawn'
+        and m.usn = any(v_usns)) then
+      raise exception 'A participant is already registered in this competition.';
+    end if;
+  end if;
+
+  select coalesce(jsonb_object_agg(r.rule_type, r.rule_value), '{}'::jsonb) into v_eligibility
+  from public.competition_eligibility_rules r
+  where r.competition_id = p_competition_id and r.is_active;
+  v_snapshot := jsonb_build_object(
+    'competition', to_jsonb(v_competition), 'rules', to_jsonb(v_rules),
+    'eligibility', v_eligibility, 'capturedAt', now()
+  );
+
+  insert into public.competition_entries (
+    competition_id, kind, team_name, captain_user_id, captain_directory_id,
+    contact_email, contact_phone, status, payment_status, rules_snapshot, answers,
+    submitted_at, created_by, seed
+  ) values (
+    p_competition_id, v_kind,
+    nullif(btrim(coalesce(p_payload->>'teamName', '')), ''),
+    auth.uid(), (select id from public.student_directory where usn = v_captain_usn),
+    nullif(p_payload->>'contactEmail', ''), nullif(p_payload->>'contactPhone', ''),
+    'submitted',
+    case when coalesce(v_settings.is_required, false) then 'pending_verification' else 'not_required' end,
+    v_snapshot, coalesce(p_payload->'answers', '{}'::jsonb), now(), auth.uid(),
+    nullif(p_payload->>'seed', '')::integer
+  ) returning id into v_entry_id;
+
+  for v_member in select value from jsonb_array_elements(p_payload->'members') loop
+    v_usn := public.normalize_usn(v_member->>'usn');
+    select * into v_directory from public.student_directory where usn = v_usn and is_active;
+    insert into public.competition_entry_members (
+      entry_id, student_directory_id, user_id, full_name, usn, department_id,
+      semester, academic_year, weight_kg, is_captain, is_substitute,
+      confirmation_status, metadata
+    ) values (
+      v_entry_id, v_directory.id,
+      (select id from public.profiles where student_directory_id = v_directory.id and account_status = 'active' limit 1),
+      v_directory.full_name, v_directory.usn, v_directory.department_id,
+      v_directory.semester, v_directory.academic_year,
+      nullif(v_member->>'weightKg', '')::numeric,
+      v_usn = v_captain_usn,
+      coalesce((v_member->>'isSubstitute')::boolean, false),
+      case when coalesce(v_rules.require_member_confirmation, false)
+        then 'pending' else 'verified' end,
+      coalesce(v_member->'metadata', '{}'::jsonb)
+    );
+  end loop;
+
+  insert into public.registration_history (entry_id, actor_id, action, to_status, details)
+  values (v_entry_id, auth.uid(), 'submitted', 'submitted',
+    jsonb_build_object('members', coalesce(jsonb_array_length(p_payload->'members'), 0)));
+
+  perform public.phase4_notify_users(
+    array[auth.uid()], 'Registration submitted',
+    'Your entry for ' || v_competition.name || ' was submitted for review.',
+    'future_event', '/my-events');
+
+  return jsonb_build_object('entryId', v_entry_id, 'status', 'submitted');
+end;
+$$;
+
+-- __PHASE4_PART7__
+
+
 
 
 
