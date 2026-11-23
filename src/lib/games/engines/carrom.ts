@@ -42,7 +42,7 @@ export interface CarromState {
   shotCount: number;
 }
 
-export interface CarromConfig extends Record<string, Json> {
+export interface CarromConfig {
   queenValue?: number;
   coinValue?: number;
   targetScore?: number;

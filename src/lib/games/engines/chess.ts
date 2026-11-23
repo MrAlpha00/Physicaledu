@@ -9,7 +9,7 @@ import { num, opponent, str } from "../engine-utils";
 import { completed, continued, rejected, type GameEngine, type Outcome } from "../types";
 
 export type ChessTimeControl = "unlimited" | "5" | "10" | "15";
-export interface ChessConfig extends Record<string, Json> {
+export interface ChessConfig {
   timeControl?: ChessTimeControl;
 }
 
