@@ -28,6 +28,15 @@ export function PublicFooter() {
             <li><Link className="hover:text-lime" href="/#for-staff">PE administration</Link></li>
           </ul>
         </div>
+        <div>
+          <p className="eyebrow text-lime">Explore</p>
+          <ul className="mt-4 space-y-3 text-sm text-chalk/75">
+            <li><Link className="hover:text-lime" href="/events">Events</Link></li>
+            <li><Link className="hover:text-lime" href="/games">Games</Link></li>
+            <li><Link className="hover:text-lime" href="/game-rules">Game Rules</Link></li>
+            <li><Link className="hover:text-lime" href="/public-info">Public Info</Link></li>
+          </ul>
+        </div>
       </div>
       <div className="border-t border-chalk/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-[0.7rem] uppercase tracking-[0.12em] text-chalk/45 sm:flex-row sm:items-center sm:justify-between sm:px-8">
