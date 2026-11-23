@@ -248,3 +248,96 @@ grant execute on function public.phase5_finalize_timeout(text, jsonb, text, inte
 
 comment on function public.phase5_finalize_timeout is
   'Service-role-only, row-locked and idempotent timeout finalisation with at-most-once rating updates.';
+
+-- Phase 6 scoped administration search. A single service-role RPC keeps the
+-- wildcard construction in SQL and returns navigation identifiers only.
+create or replace function public.phase6_admin_search(p_query text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_clean text := btrim(coalesce(p_query, ''));
+  v_term text;
+  v_href_term text;
+  v_groups jsonb;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'Service role access required';
+  end if;
+
+  v_clean := regexp_replace(v_clean, '[^a-zA-Z0-9 ._-]', '', 'g');
+  v_clean := btrim(v_clean);
+  if length(v_clean) < 2 then
+    return jsonb_build_object('groups', '[]'::jsonb);
+  end if;
+
+  v_term := '%' || v_clean || '%';
+  v_href_term := replace(regexp_replace(v_clean, '\s+', ' ', 'g'), ' ', '%20');
+
+  select jsonb_build_array(
+    jsonb_build_object(
+      'type', 'student', 'label', 'Students',
+      'items', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', s.id, 'title', s.full_name, 'subtitle', s.usn,
+          'href', '/admin/students?search=' || v_href_term
+        ) order by s.full_name)
+        from (
+          select id, usn, full_name from public.student_directory
+          where usn ilike v_term or full_name ilike v_term
+          order by full_name limit 5
+        ) s
+      ), '[]'::jsonb)
+    ),
+    jsonb_build_object(
+      'type', 'event', 'label', 'Events',
+      'items', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', e.id, 'title', e.name, 'subtitle', e.slug,
+          'href', '/admin/events/' || e.id
+        ) order by e.name)
+        from (
+          select id, name, slug from public.sports_events
+          where name ilike v_term or slug ilike v_term
+          order by name limit 5
+        ) e
+      ), '[]'::jsonb)
+    ),
+    jsonb_build_object(
+      'type', 'equipment', 'label', 'Equipment',
+      'items', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', i.id, 'title', i.name, 'subtitle', i.identification_number,
+          'href', '/admin/equipment/' || i.id
+        ) order by i.name)
+        from (
+          select id, name, identification_number from public.equipment_items
+          where name ilike v_term or identification_number ilike v_term
+          order by name limit 5
+        ) i
+      ), '[]'::jsonb)
+    ),
+    jsonb_build_object(
+      'type', 'game', 'label', 'Games',
+      'items', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', g.slug, 'title', g.name, 'subtitle', g.tagline,
+          'href', '/games/' || g.slug
+        ) order by g.sort_order, g.name)
+        from (
+          select slug, name, tagline, sort_order from public.game_catalog
+          where name ilike v_term or short_name ilike v_term
+          order by sort_order, name limit 5
+        ) g
+      ), '[]'::jsonb)
+    )
+  ) into v_groups;
+
+  return jsonb_build_object('groups', v_groups);
+end;
+$$;
+
+revoke all on function public.phase6_admin_search(text) from public, anon, authenticated;
+grant execute on function public.phase6_admin_search(text) to service_role;

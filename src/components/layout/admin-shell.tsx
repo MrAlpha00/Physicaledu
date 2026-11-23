@@ -214,6 +214,7 @@ export function AdminShell({
             <span className="eyebrow text-ink-muted sm:hidden">Admin</span>
           </div>
           <div className="flex items-center gap-3">
+            <AdminSearch />
             <div className="hidden text-right sm:block">
               <p className="text-xs font-bold">{userName}</p>
               <p className="text-[0.65rem] uppercase tracking-[0.1em] text-ink-muted">PE Admin</p>
