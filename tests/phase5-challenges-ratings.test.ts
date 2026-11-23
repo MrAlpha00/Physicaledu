@@ -110,6 +110,7 @@ describe("Phase 5 — independent Elo ratings", () => {
 
   it("never rates guests, practice, incomplete, cancelled or disputed matches", () => {
     for (const input of [
+      { mode: "guest" as const, status: "completed", outcome: win },
       { mode: "practice" as const, status: "completed", outcome: win },
       { mode: "friendly" as const, status: "completed", outcome: win },
       { mode: "ranked" as const, status: "active", outcome: win },
