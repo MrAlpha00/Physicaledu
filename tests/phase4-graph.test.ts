@@ -100,8 +100,10 @@ describe('Phase 4 React Flow canvas projection', () => {
     expect(graph.nodes.filter(node => node.type === 'participantNode')).toHaveLength(4)
     expect(graph.edges.filter(edge => edge.id.startsWith('feed:'))).toHaveLength(4)
     expect(graph.edges.filter(edge => edge.id.startsWith('progress:'))).toHaveLength(2)
+    const first = graph.nodes.find(node => node.id === `match:${plan.matches[0].key}`)!
+    expect(first.data.sublabel).toBe('Team A vs Team B')
     const final = graph.nodes.find(node => node.id === `match:${plan.matches[2].key}`)!
-    expect(final.data.sublabel).toBe('Team A vs Team B')
+    expect(final.data.sublabel).toBe('TBD vs TBD')
   })
 
   it('uses database overlays for status, winner and compact labels', () => {
