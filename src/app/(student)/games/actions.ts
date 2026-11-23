@@ -125,7 +125,7 @@ export async function searchOpponentsAction(query: string): Promise<{ ok: boolea
 }
 
 export async function createChallengeAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const user = await requireUser();
+  await requireUser();
   const parsed = createChallengeSchema.safeParse({
     gameSlug: formData.get("gameSlug"),
     opponentId: formData.get("opponentId"),
@@ -232,7 +232,7 @@ export async function submitMatchAction(publicId: string, raw: unknown): Promise
 
   const admin = createAdminClient();
   const outcomeJson = result.outcome ? (result.outcome as unknown as Json) : null;
-  const { data, error } = await admin.rpc("phase5_submit_action", {
+  const { error } = await admin.rpc("phase5_submit_action", {
     p_public_id: publicId,
     p_user_id: user.id,
     p_actor: action.actor,

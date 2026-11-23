@@ -32,7 +32,7 @@ export function ChessBoard({ state, active, onAction, disabled, names }: BoardPr
       if (move?.promotion) {
         setPromotion({ from: selected, to: square });
       } else {
-        onAction("move", { from: selected, to: square, now: Date.now() });
+        onAction("move", { from: selected, to: square });
         setSelected(null);
       }
       return;
@@ -101,7 +101,7 @@ export function ChessBoard({ state, active, onAction, disabled, names }: BoardPr
                   key={item.key}
                   type="button"
                   onClick={() => {
-                    onAction("move", { from: promotion.from, to: promotion.to, promotion: item.key, now: Date.now() } as Record<string, Json>);
+                    onAction("move", { from: promotion.from, to: promotion.to, promotion: item.key });
                     setPromotion(null);
                     setSelected(null);
                   }}
@@ -117,7 +117,7 @@ export function ChessBoard({ state, active, onAction, disabled, names }: BoardPr
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-chalk/60">
         <span>{state.history.length} moves played · {state.timeControl} min clock</span>
         {!disabled && state.status === "active" ? (
-          <button type="button" onClick={() => onAction("offerDraw", { now: Date.now() })} className="underline hover:text-lime">
+          <button type="button" onClick={() => onAction("offerDraw", {})} className="underline hover:text-lime">
             Offer draw
           </button>
         ) : null}

@@ -10,12 +10,7 @@ export function BasketballBoard({ state, names, active, onAction, disabled, last
   const [angle, setAngle] = useState(52);
   const [power, setPower] = useState(72);
   const [timing, setTiming] = useState(50);
-  const [flight, setFlight] = useState(0);
-
-  const last = state.lastShot;
-  useEffect(() => {
-    if (last) setFlight((value) => value + 1);
-  }, [last?.index, last]);
+  const flight = state.lastShot?.index ?? 0;
 
   const quality = Math.round(shotQuality(angle, power, timing) * 100);
   const control = Math.round(-60 + (100 - power) * 1.6 + Math.abs(angle - 52) * 1.4);
