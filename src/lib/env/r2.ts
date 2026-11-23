@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * Server-only R2 configuration. Never import from a Client Component and never
  * expose these values through a NEXT_PUBLIC_ variable.

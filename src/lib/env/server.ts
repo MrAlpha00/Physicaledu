@@ -1,3 +1,5 @@
+import "server-only";
+
 export function getSecretSupabaseKey(): string {
   const key = process.env.SUPABASE_SECRET_KEY;
 

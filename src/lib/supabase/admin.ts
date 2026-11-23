@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getPublicSupabaseConfig } from "@/lib/env/public";
 import { getSecretSupabaseKey } from "@/lib/env/server";
