@@ -75,6 +75,7 @@ export function StudentShell({
                 <Link
                   key={href}
                   href={href}
+                  aria-current={isActive(href) ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-2 border-b-2 px-3 py-5 text-xs font-bold uppercase tracking-[0.1em] transition-colors",
                     isActive(href)
@@ -140,6 +141,7 @@ export function StudentShell({
           <Link
             key={href}
             href={href}
+            aria-current={isActive(href) ? "page" : undefined}
             className={cn(
               "flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 px-2 py-3 text-[0.62rem] font-bold uppercase tracking-[0.08em]",
               isActive(href) ? "text-cobalt" : "text-ink-muted",
