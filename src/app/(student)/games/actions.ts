@@ -8,6 +8,7 @@ import { getMatchByPublicId } from "@/lib/data/phase5";
 import { applyAuthoritativeAction, participantIndex } from "@/lib/games/match-service";
 import { engineFor } from "@/lib/games/registry";
 import { broadcastChannelMessage, matchChannelName } from "@/lib/games/realtime";
+import { lazyExpireMatch } from "@/lib/games/timeouts";
 import type { GameSlug, MatchEnvelope, MatchMode, PlayerIndex } from "@/lib/games/types";
 import { awardGameAchievements, notifyGameUsers, recordGameParticipation, writeGameAudit } from "@/lib/operations/phase5";
 import {
@@ -176,6 +177,7 @@ export async function cancelChallengeAction(challengeId: string): Promise<Action
 
 export async function setReadyAction(publicId: string, ready: boolean): Promise<ActionState> {
   await requireUser();
+  await lazyExpireMatch(publicId).catch(() => null);
   const supabase = await createClient();
   const { error } = await supabase.rpc("phase5_set_ready", { p_public_id: publicId, p_ready: ready });
   if (error) return fail(error.message);
@@ -192,6 +194,7 @@ export async function setConnectionAction(publicId: string, connected: boolean):
 
 export async function startMatchAction(publicId: string): Promise<ActionState> {
   await requireUser();
+  await lazyExpireMatch(publicId).catch(() => null);
   const supabase = await createClient();
   const { error } = await supabase.rpc("phase5_start_match", { p_public_id: publicId });
   if (error) return fail(error.message);
@@ -215,6 +218,9 @@ export async function submitMatchAction(publicId: string, raw: unknown): Promise
   const user = await requireUser();
   const parsed = gameActionSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Malformed action." };
+
+  // Lazy server-side fallback: an expired match cannot accept further moves.
+  await lazyExpireMatch(publicId).catch(() => null);
 
   const view = await getMatchByPublicId(publicId);
   if (!view) return { ok: false, error: "Match not found." };
@@ -277,6 +283,7 @@ export async function submitMatchAction(publicId: string, raw: unknown): Promise
 
 export async function resignAction(publicId: string): Promise<ActionState> {
   const user = await requireUser();
+  await lazyExpireMatch(publicId).catch(() => null);
   const view = await getMatchByPublicId(publicId);
   if (!view) return fail("Match not found.");
   const envelope = toEnvelope(view);

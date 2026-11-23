@@ -38,8 +38,18 @@ export function PwaManager() {
   const [updateBusy, setUpdateBusy] = useState(false);
 
   useEffect(() => {
-    setInstalled(isStandalone());
-    setOffline(!navigator.onLine);
+    let active = true;
+
+    // Environment snapshots are applied asynchronously so the effect body only
+    // subscribes to external systems (the React-recommended pattern).
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setInstalled(isStandalone());
+      setOffline(!navigator.onLine);
+      if (isIosBrowser() && !isStandalone() && !sessionStorage.getItem("varsity-ios-tip-dismissed")) {
+        setShowIosTip(true);
+      }
+    });
 
     const onOnline = () => setOffline(false);
     const onOffline = () => setOffline(true);
@@ -58,16 +68,11 @@ export function PwaManager() {
     window.addEventListener("beforeinstallprompt", onInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
 
-    if (isIosBrowser() && !isStandalone() && !sessionStorage.getItem("varsity-ios-tip-dismissed")) {
-      setShowIosTip(true);
-    }
-
-    let registration: ServiceWorkerRegistration | null = null;
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
       navigator.serviceWorker
         .register("/sw.js", { scope: "/" })
         .then((registered) => {
-          registration = registered;
+          if (!active) return;
           if (registered.waiting) setUpdateWaiting(registered.waiting);
           registered.addEventListener("updatefound", () => {
             const worker = registered.installing;
@@ -82,11 +87,11 @@ export function PwaManager() {
     }
 
     return () => {
+      active = false;
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       window.removeEventListener("beforeinstallprompt", onInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
-      void registration;
     };
   }, []);
 

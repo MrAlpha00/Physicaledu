@@ -78,7 +78,11 @@ describe("Phase 5 migration — RLS and privilege boundaries", () => {
   });
 
   it("adds realtime tables without disabling RLS and protects student prefixes in middleware", () => {
-    expect(migration).toContain("alter publication supabase_realtime add table public.game_matches");
+    // Rerun-safe publication setup uses a guarded dynamic statement rather than
+    // a bare ALTER, which would fail on a database that already has the table.
+    expect(migration).toContain("'game_matches'");
+    expect(migration).toContain("alter publication supabase_realtime add table public.%I");
+    expect(migration).toContain("pg_publication_tables");
     expect(migration).not.toContain("alter table public.game_matches disable row level security");
     for (const prefix of ["/games/dashboard", "/games/challenges", "/games/match", "/games/profile", "/games/history"]) {
       expect(middleware).toContain(`"${prefix}"`);

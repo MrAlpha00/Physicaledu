@@ -2423,6 +2423,18 @@ export interface Database {
         };
         Returns: Json;
       };
+      phase5_finalize_timeout: {
+        Args: {
+          p_public_id: string;
+          p_outcome: Json;
+          p_reason: string;
+          p_actor?: number;
+          p_clock_expired?: boolean;
+          p_grace_minutes?: number | null;
+          p_apply_rating?: boolean;
+        };
+        Returns: Json;
+      };
       phase5_admin_save_game: { Args: { p_slug: string; p_data: Json }; Returns: undefined };
       phase5_admin_save_settings: { Args: { p_slug: string; p_data: Json }; Returns: undefined };
       phase5_admin_adjust_rating: {

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth/session";
 import { getMatchByPublicId } from "@/lib/data/phase5";
 import { isGameSlug } from "@/lib/games/catalog";
+import { lazyExpireMatch } from "@/lib/games/timeouts";
 import type { GameSlug, PlayerIndex } from "@/lib/games/types";
 import type { Json } from "@/types/database";
 
@@ -21,6 +22,7 @@ function asRecord(value: Json): Record<string, Json> {
 export default async function MatchRoomPage({ params }: { params: Promise<{ matchId: string }> }) {
   const { matchId } = await params;
   const user = await requireUser();
+  await lazyExpireMatch(matchId).catch(() => null);
   const match = await getMatchByPublicId(matchId);
   if (!match || !isGameSlug(match.game_slug)) notFound();
 
