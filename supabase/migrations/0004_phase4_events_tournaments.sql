@@ -517,5 +517,722 @@ create table public.phase4_calendar_links (
   primary key (source_type, source_id)
 );
 
--- __PHASE4_PART3__
+/* ------------------------------------------------------------------------- */
+/* Scoped access helpers — organisers never receive a global admin role        */
+/* ------------------------------------------------------------------------- */
+
+create or replace function public.phase4_is_admin()
+returns boolean language sql security definer stable set search_path = public, pg_temp as $$
+  select public.is_pe_admin();
+$$;
+
+create or replace function public.phase4_has_sport_access(
+  p_competition_id uuid, p_user_id uuid default auth.uid()
+) returns boolean language sql security definer stable set search_path = public, pg_temp as $$
+  select exists (
+    select 1 from public.sport_organizer_assignments a
+    where a.competition_id = p_competition_id
+      and a.user_id = p_user_id
+      and a.status = 'active'
+  );
+$$;
+
+create or replace function public.phase4_event_is_public(p_event_id uuid)
+returns boolean language sql security definer stable set search_path = public, pg_temp as $$
+  select exists (
+    select 1 from public.sports_events e
+    where e.id = p_event_id and e.is_public
+      and e.status in ('published', 'registration_open', 'registration_closed', 'ongoing', 'completed')
+  );
+$$;
+
+create or replace function public.phase4_competition_is_public(p_competition_id uuid)
+returns boolean language sql security definer stable set search_path = public, pg_temp as $$
+  select exists (
+    select 1 from public.event_sports s
+    join public.sports_events e on e.id = s.event_id
+    where s.id = p_competition_id and s.is_public and s.status <> 'draft'
+      and public.phase4_event_is_public(e.id)
+  );
+$$;
+
+create or replace function public.phase4_owns_entry(p_entry_id uuid, p_user_id uuid default auth.uid())
+returns boolean language sql security definer stable set search_path = public, pg_temp as $$
+  select exists (
+    select 1 from public.competition_entries en
+    where en.id = p_entry_id and en.captain_user_id = p_user_id
+  ) or exists (
+    select 1 from public.competition_entry_members m
+    where m.entry_id = p_entry_id and m.user_id = p_user_id
+  );
+$$;
+
+create or replace function public.phase4_can_view_competition(p_competition_id uuid)
+returns boolean language sql security definer stable set search_path = public, pg_temp as $$
+  select public.phase4_competition_is_public(p_competition_id)
+    or public.phase4_has_sport_access(p_competition_id)
+    or public.phase4_is_admin();
+$$;
+
+create or replace function public.phase4_can_view_file(p_file_id uuid)
+returns boolean language sql security definer stable set search_path = public, pg_temp as $$
+  select exists (
+    select 1 from public.phase4_files f
+    where f.id = p_file_id
+      and (
+        public.phase4_is_admin()
+        or f.uploader_id = auth.uid()
+        or (
+          f.visibility = 'public'
+          and f.parent_type in ('event_banner', 'event_logo', 'sport_image', 'payment_qr')
+          and f.upload_status = 'confirmed'
+          and (
+            (f.parent_type in ('event_banner', 'event_logo')
+              and public.phase4_event_is_public(f.parent_id))
+            or (f.parent_type in ('sport_image', 'payment_qr')
+              and public.phase4_competition_is_public(f.parent_id))
+          )
+        )
+      )
+  );
+$$;
+
+create or replace function public.phase4_notify_users(
+  p_user_ids uuid[], p_title text, p_body text,
+  p_category text default 'general', p_link text default null
+) returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_user uuid;
+  v_count integer := 0;
+begin
+  if p_user_ids is null then return 0; end if;
+  foreach v_user in array p_user_ids loop
+    if v_user is not null then
+      perform public.phase3_notify_user(v_user, p_title, p_body, p_category, p_link, 'normal', null);
+      v_count := v_count + 1;
+    end if;
+  end loop;
+  return v_count;
+end;
+$$;
+
+/* ------------------------------------------------------------------------- */
+/* Row level security                                                         */
+/* ------------------------------------------------------------------------- */
+
+alter table public.phase4_files enable row level security;
+alter table public.sports_events enable row level security;
+alter table public.event_sports enable row level security;
+alter table public.competition_rules enable row level security;
+alter table public.competition_eligibility_rules enable row level security;
+alter table public.competition_entries enable row level security;
+alter table public.competition_entry_members enable row level security;
+alter table public.registration_history enable row level security;
+alter table public.participant_invitations enable row level security;
+alter table public.competition_payment_settings enable row level security;
+alter table public.competition_payment_records enable row level security;
+alter table public.payment_verification_history enable row level security;
+alter table public.tournament_draws enable row level security;
+alter table public.tournament_stages enable row level security;
+alter table public.tournament_groups enable row level security;
+alter table public.tournament_participants enable row level security;
+alter table public.tournament_matches enable row level security;
+alter table public.tournament_match_slots enable row level security;
+alter table public.tournament_match_results enable row level security;
+alter table public.tournament_match_result_history enable row level security;
+alter table public.tournament_standings enable row level security;
+alter table public.tournament_graph_edges enable row level security;
+alter table public.tournament_node_positions enable row level security;
+alter table public.sport_organizer_assignments enable row level security;
+alter table public.organizer_invitations enable row level security;
+alter table public.organizer_activity_logs enable row level security;
+alter table public.phase4_calendar_links enable row level security;
+
+create policy phase4_files_admin_all on public.phase4_files for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_files_owner_read on public.phase4_files for select to authenticated
+  using (uploader_id = auth.uid());
+create policy phase4_files_public_read on public.phase4_files for select to anon, authenticated
+  using (public.phase4_can_view_file(id));
+
+create policy phase4_events_admin_all on public.sports_events for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_events_public_read on public.sports_events for select to anon, authenticated
+  using (public.phase4_event_is_public(id));
+create policy phase4_events_organizer_read on public.sports_events for select to authenticated
+  using (exists (
+    select 1 from public.event_sports s
+    where s.event_id = public.sports_events.id and public.phase4_has_sport_access(s.id)));
+
+create policy phase4_sports_admin_all on public.event_sports for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_sports_public_read on public.event_sports for select to anon, authenticated
+  using (public.phase4_competition_is_public(id));
+create policy phase4_sports_organizer_read on public.event_sports for select to authenticated
+  using (public.phase4_has_sport_access(id));
+
+create policy phase4_rules_admin_all on public.competition_rules for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_rules_read on public.competition_rules for select to anon, authenticated
+  using (public.phase4_can_view_competition(competition_id));
+create policy phase4_eligibility_admin_all on public.competition_eligibility_rules for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_eligibility_organizer_read on public.competition_eligibility_rules for select to authenticated
+  using (public.phase4_has_sport_access(competition_id));
+create policy phase4_eligibility_public_read on public.competition_eligibility_rules for select to anon, authenticated
+  using (public.phase4_competition_is_public(competition_id));
+
+create policy phase4_entries_admin_all on public.competition_entries for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_entries_owner_read on public.competition_entries for select to authenticated
+  using (public.phase4_owns_entry(id));
+create policy phase4_entries_organizer_read on public.competition_entries for select to authenticated
+  using (public.phase4_has_sport_access(competition_id));
+
+create policy phase4_members_admin_all on public.competition_entry_members for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_members_owner_read on public.competition_entry_members for select to authenticated
+  using (public.phase4_owns_entry(entry_id));
+create policy phase4_members_organizer_read on public.competition_entry_members for select to authenticated
+  using (exists (
+    select 1 from public.competition_entries en
+    where en.id = entry_id and public.phase4_has_sport_access(en.competition_id)));
+
+create policy phase4_registration_history_admin_all on public.registration_history for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_registration_history_owner_read on public.registration_history for select to authenticated
+  using (public.phase4_owns_entry(entry_id));
+
+create policy phase4_participant_invites_admin_all on public.participant_invitations for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_participant_invites_owner_read on public.participant_invitations for select to authenticated
+  using (exists (
+    select 1 from public.competition_entry_members m
+    where m.id = member_id and m.user_id = auth.uid()));
+
+create policy phase4_payment_settings_admin_all on public.competition_payment_settings for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_payment_settings_public_read on public.competition_payment_settings for select to anon, authenticated
+  using (is_required and public.phase4_competition_is_public(competition_id));
+
+create policy phase4_payment_records_admin_all on public.competition_payment_records for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_payment_records_owner_read on public.competition_payment_records for select to authenticated
+  using (public.phase4_owns_entry(entry_id));
+create policy phase4_payment_history_admin_all on public.payment_verification_history for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_payment_history_owner_read on public.payment_verification_history for select to authenticated
+  using (exists (
+    select 1 from public.competition_payment_records p
+    where p.id = payment_id and public.phase4_owns_entry(p.entry_id)));
+
+-- Tournament tables: public read of validated structures, organiser read of
+-- assigned competitions, writes exclusively through admin RPCs.
+create policy phase4_draws_admin_all on public.tournament_draws for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_draws_read on public.tournament_draws for select to anon, authenticated
+  using (exists (
+    select 1 from public.event_sports s
+    where s.id = competition_id and public.phase4_competition_is_public(s.id)));
+
+create policy phase4_stages_admin_all on public.tournament_stages for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_stages_read on public.tournament_stages for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_draws d
+    where d.id = draw_id and public.phase4_competition_is_public(d.competition_id)));
+
+create policy phase4_groups_admin_all on public.tournament_groups for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_groups_read on public.tournament_groups for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_stages st
+    join public.tournament_draws d on d.id = st.draw_id
+    where st.id = stage_id and public.phase4_competition_is_public(d.competition_id)));
+
+create policy phase4_participants_admin_all on public.tournament_participants for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_participants_read on public.tournament_participants for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_draws d
+    where d.id = draw_id and public.phase4_competition_is_public(d.competition_id)));
+
+create policy phase4_matches_admin_all on public.tournament_matches for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_matches_organizer_read on public.tournament_matches for select to authenticated
+  using (exists (
+    select 1 from public.tournament_draws d
+    where d.id = draw_id and public.phase4_has_sport_access(d.competition_id)));
+create policy phase4_matches_public_read on public.tournament_matches for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_draws d
+    where d.id = draw_id and public.phase4_competition_is_public(d.competition_id)));
+
+create policy phase4_slots_admin_all on public.tournament_match_slots for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_slots_read on public.tournament_match_slots for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_matches m
+    join public.tournament_draws d on d.id = m.draw_id
+    where m.id = match_id and public.phase4_competition_is_public(d.competition_id)));
+
+create policy phase4_results_admin_all on public.tournament_match_results for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_results_organizer_read on public.tournament_match_results for select to authenticated
+  using (exists (
+    select 1 from public.tournament_matches m
+    join public.tournament_draws d on d.id = m.draw_id
+    where m.id = match_id and public.phase4_has_sport_access(d.competition_id)));
+create policy phase4_results_public_read on public.tournament_match_results for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_matches m
+    join public.tournament_draws d on d.id = m.draw_id
+    join public.event_sports s on s.id = d.competition_id
+    where m.id = match_id and m.status = 'completed'
+      and public.phase4_competition_is_public(s.id)));
+
+create policy phase4_result_history_admin_all on public.tournament_match_result_history for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_result_history_read on public.tournament_match_result_history for select to authenticated
+  using (exists (
+    select 1 from public.tournament_matches m
+    join public.tournament_draws d on d.id = m.draw_id
+    where m.id = match_id and public.phase4_has_sport_access(d.competition_id)));
+
+create policy phase4_standings_admin_all on public.tournament_standings for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_standings_read on public.tournament_standings for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_draws d
+    where d.id = draw_id and public.phase4_competition_is_public(d.competition_id)));
+
+create policy phase4_edges_admin_all on public.tournament_graph_edges for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_edges_read on public.tournament_graph_edges for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_draws d
+    where d.id = draw_id and public.phase4_competition_is_public(d.competition_id)));
+create policy phase4_positions_admin_all on public.tournament_node_positions for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_positions_read on public.tournament_node_positions for select to anon, authenticated
+  using (exists (
+    select 1 from public.tournament_draws d
+    where d.id = draw_id and public.phase4_competition_is_public(d.competition_id)));
+
+create policy phase4_assignments_admin_all on public.sport_organizer_assignments for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_assignments_own_read on public.sport_organizer_assignments for select to authenticated
+  using (user_id = auth.uid());
+
+create policy phase4_invitations_admin_all on public.organizer_invitations for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_invitations_own_read on public.organizer_invitations for select to authenticated
+  using (student_directory_id = public.current_phase3_student_directory_id());
+
+create policy phase4_activity_admin_all on public.organizer_activity_logs for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_activity_own_read on public.organizer_activity_logs for select to authenticated
+  using (user_id = auth.uid() or public.phase4_has_sport_access(competition_id));
+
+create policy phase4_calendar_links_admin_all on public.phase4_calendar_links for all to authenticated
+  using (public.phase4_is_admin()) with check (public.phase4_is_admin());
+create policy phase4_calendar_links_read on public.phase4_calendar_links for select to authenticated
+  using (public.phase4_is_admin() or source_type = 'match');
+
+/* ------------------------------------------------------------------------- */
+/* Grants — RLS remains the final authority                                   */
+/* ------------------------------------------------------------------------- */
+
+grant select on all tables in schema public to anon;
+grant select, insert, update, delete on
+  public.phase4_files, public.sports_events, public.event_sports,
+  public.competition_rules, public.competition_eligibility_rules,
+  public.competition_entries, public.competition_entry_members,
+  public.registration_history, public.participant_invitations,
+  public.competition_payment_settings, public.competition_payment_records,
+  public.payment_verification_history, public.tournament_draws,
+  public.tournament_stages, public.tournament_groups,
+  public.tournament_participants, public.tournament_matches,
+  public.tournament_match_slots, public.tournament_match_results,
+  public.tournament_match_result_history, public.tournament_standings,
+  public.tournament_graph_edges, public.tournament_node_positions,
+  public.sport_organizer_assignments, public.organizer_invitations,
+  public.organizer_activity_logs, public.phase4_calendar_links
+  to authenticated;
+
+/* ------------------------------------------------------------------------- */
+/* Transactional operations                                                   */
+/* ------------------------------------------------------------------------- */
+
+create or replace function public.phase4_validate_plan(p_plan jsonb)
+returns text[] language plpgsql stable set search_path = public, pg_temp as $$
+declare
+  v_errors text[] := '{}';
+  v_count integer;
+  v_unique integer;
+  v_cycles integer;
+begin
+  if p_plan is null or p_plan->'matches' is null then
+    return array['Tournament plan has no matches.'];
+  end if;
+
+  select count(*) into v_count from jsonb_array_elements(p_plan->'matches');
+  select count(distinct value->>'key') into v_unique from jsonb_array_elements(p_plan->'matches');
+  if v_count <> v_unique then
+    v_errors := array_append(v_errors, 'Duplicate match identifiers in draw.');
+  end if;
+
+  select count(*) into v_count from jsonb_array_elements(p_plan->'matches') m
+  where m.value->>'slotA' is null or m.value->>'slotB' is null;
+  if v_count > 0 then
+    v_errors := array_append(v_errors, 'A match is missing a slot.');
+  end if;
+
+  select count(*) into v_count
+  from jsonb_array_elements(coalesce(p_plan->'edges', '[]'::jsonb)) e
+  where not exists (
+    select 1 from jsonb_array_elements(p_plan->'matches') m
+    where m.value->>'key' = e.value->>'sourceMatchKey')
+    or not exists (
+    select 1 from jsonb_array_elements(p_plan->'matches') m
+    where m.value->>'key' = e.value->>'targetMatchKey');
+  if v_count > 0 then
+    v_errors := array_append(v_errors, 'Progression edge references an unknown match.');
+  end if;
+
+  select count(*) into v_count
+  from jsonb_array_elements(coalesce(p_plan->'edges', '[]'::jsonb)) e
+  group by e.value->>'targetMatchKey', e.value->>'targetSlot'
+  having count(*) > 1;
+  get diagnostics v_unique = row_count;
+  if v_unique > 0 then
+    v_errors := array_append(v_errors, 'A match slot has multiple incoming feeds.');
+  end if;
+
+  with recursive graph as (
+    select e.value->>'sourceMatchKey' as src, e.value->>'targetMatchKey' as dst
+    from jsonb_array_elements(coalesce(p_plan->'edges', '[]'::jsonb)) e
+  ), walk(start_key, current_key, depth) as (
+    select src, dst, 1 from graph where src <> dst
+    union all
+    select w.start_key, g.dst, w.depth + 1
+    from walk w join graph g on g.src = w.current_key
+    where w.depth < 64
+  )
+  select count(*) into v_cycles from walk where start_key = current_key;
+  if v_cycles > 0 then
+    v_errors := array_append(v_errors, 'Tournament progression contains a cycle.');
+  end if;
+
+  return v_errors;
+end;
+$$;
+
+create or replace function public.phase4_save_draw(
+  p_competition_id uuid, p_plan jsonb, p_reason text default null
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_competition public.event_sports%rowtype;
+  v_old_draw public.tournament_draws%rowtype;
+  v_errors text[];
+  v_draw_id uuid;
+  v_stage_id uuid;
+  v_group_stage_id uuid;
+  v_match_map jsonb := '{}'::jsonb;
+  v_match jsonb;
+  v_edge jsonb;
+  v_round jsonb;
+  v_group jsonb;
+  v_slot jsonb;
+  v_entry_id text;
+  v_resolved_entry uuid;
+  v_placeholder text;
+  v_participant_id uuid;
+  v_match_id uuid;
+  v_target_match_id uuid;
+  v_source_match_id uuid;
+  v_match_count integer := 0;
+  v_version integer := 1;
+  v_old_positions jsonb;
+  v_position jsonb;
+  v_key text;
+begin
+  if not public.phase4_is_admin() then
+    raise exception 'PE Admin access required';
+  end if;
+
+  select * into v_competition from public.event_sports where id = p_competition_id;
+  if not found then raise exception 'Competition not found'; end if;
+
+  v_errors := public.phase4_validate_plan(p_plan);
+  if coalesce(array_length(v_errors, 1), 0) > 0 then
+    raise exception 'Invalid tournament draw: %', array_to_string(v_errors, ' ');
+  end if;
+
+  select * into v_old_draw from public.tournament_draws
+  where competition_id = p_competition_id and status in ('active', 'locked')
+  order by version desc limit 1;
+
+  if found then
+    v_version := v_old_draw.version + 1;
+    if v_old_draw.status = 'locked' and coalesce(btrim(p_reason), '') = '' then
+      raise exception 'A locked draw requires an administrative reason to regenerate.';
+    end if;
+    if exists (
+      select 1 from public.tournament_matches m
+      where m.draw_id = v_old_draw.id
+        and (m.status in ('completed', 'ongoing', 'result_submitted')
+          or exists (select 1 from public.tournament_match_results r where r.match_id = m.id))
+    ) and coalesce(btrim(p_reason), '') = '' then
+      raise exception 'Regenerating after results require an administrative reason.';
+    end if;
+    select coalesce(jsonb_object_agg(node_key, position), '{}'::jsonb) into v_old_positions
+    from public.tournament_node_positions where draw_id = v_old_draw.id;
+    update public.tournament_draws set status = 'archived', updated_at = now()
+    where id = v_old_draw.id;
+  else
+    v_old_positions := '{}'::jsonb;
+  end if;
+
+  insert into public.tournament_draws (
+    competition_id, format, draw_mode, draw_seed, version, status, payload, generated_by
+  ) values (
+    p_competition_id, v_competition.tournament_format, v_competition.draw_mode,
+    coalesce((p_plan->>'drawSeed')::bigint, 0), v_version, 'active',
+    p_plan, auth.uid()
+  ) returning id into v_draw_id;
+
+  for v_round in select value from jsonb_array_elements(coalesce(p_plan->'rounds', '[]'::jsonb)) loop
+    insert into public.tournament_stages (draw_id, stage_key, name, stage_type, sequence)
+    values (
+      v_draw_id, v_round.value->>'key',
+      coalesce(v_round.value->>'name', v_round.value->>'key'),
+      coalesce(v_round.value->>'stage_type', v_round.value->>'stage', 'knockout'),
+      coalesce((v_round.value->>'roundNumber')::integer, 1)
+    ) on conflict do nothing;
+  end loop;
+
+  select id into v_group_stage_id from public.tournament_stages
+  where draw_id = v_draw_id and stage_type = 'group' limit 1;
+
+  for v_group in select value from jsonb_array_elements(coalesce(p_plan->'groups', '[]'::jsonb)) loop
+    insert into public.tournament_groups (stage_id, group_key, name, sort_order)
+    values (
+      coalesce(v_group_stage_id, (select id from public.tournament_stages where draw_id = v_draw_id limit 1)),
+      v_group.value->>'key', coalesce(v_group.value->>'name', v_group.value->>'key'), 0
+    ) on conflict do nothing;
+  end loop;
+
+  for v_match in select value from jsonb_array_elements(p_plan->'matches') loop
+    select id into v_stage_id from public.tournament_stages
+    where draw_id = v_draw_id and stage_key = coalesce(v_match.value->>'roundKey', 'r1') limit 1;
+
+    insert into public.tournament_matches (
+      draw_id, stage_id, group_id, round_key, round_name, round_number,
+      match_number, status, is_bye, venue
+    ) values (
+      v_draw_id, v_stage_id,
+      (select id from public.tournament_groups g
+       where g.stage_id in (select id from public.tournament_stages where draw_id = v_draw_id)
+         and g.group_key = v_match.value->>'groupKey' limit 1),
+      coalesce(v_match.value->>'roundKey', 'r1'),
+      coalesce(v_match.value->>'roundName', 'Match'),
+      coalesce((select (value->>'roundNumber')::integer from jsonb_array_elements(p_plan->'rounds') r
+                where r.value->>'key' = v_match.value->>'roundKey' limit 1), 1),
+      (v_match.value->>'matchNumber')::integer,
+      case when coalesce((v_match.value->>'isBye')::boolean, false) then 'completed' else 'scheduled' end,
+      coalesce((v_match.value->>'isBye')::boolean, false),
+      v_match.value->>'venue'
+    ) returning id into v_match_id;
+
+    v_match_map := v_match_map || jsonb_build_object(v_match.value->>'key', v_match_id::text);
+    v_match_count := v_match_count + 1;
+
+    for v_slot in select value from jsonb_array_elements(jsonb_build_array(
+      v_match.value->'slotA' || jsonb_build_object('slotName', 'a'),
+      v_match.value->'slotB' || jsonb_build_object('slotName', 'b')
+    )) loop
+      v_entry_id := nullif(v_slot.value->>'entryId', '');
+      v_resolved_entry := null;
+      v_placeholder := null;
+      if v_entry_id is not null and v_entry_id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
+        v_resolved_entry := v_entry_id::uuid;
+        insert into public.tournament_participants (draw_id, entry_id, seed)
+        values (v_draw_id, v_resolved_entry, (v_match.value->>'seed')::integer)
+        on conflict do nothing;
+      elsif v_entry_id is not null then
+        v_placeholder := v_entry_id;
+        insert into public.tournament_participants (draw_id, placeholder_key, status)
+        values (v_draw_id, v_placeholder, 'qualified')
+        on conflict do nothing;
+      end if;
+
+      if v_resolved_entry is not null then
+        select id into v_participant_id from public.tournament_participants
+        where draw_id = v_draw_id and entry_id = v_resolved_entry;
+      elsif v_placeholder is not null then
+        select id into v_participant_id from public.tournament_participants
+        where draw_id = v_draw_id and placeholder_key = v_placeholder;
+      else
+        v_participant_id := null;
+      end if;
+
+      insert into public.tournament_match_slots (
+        match_id, slot, entry_id, participant_id, source_match_id, from_bye
+      ) values (
+        v_match_id, v_slot.value->>'slotName', v_resolved_entry, v_participant_id,
+        null,
+        coalesce((v_slot.value->>'fromBye')::boolean, false)
+      ) on conflict (match_id, slot) do update set
+        entry_id = excluded.entry_id,
+        participant_id = excluded.participant_id,
+        from_bye = excluded.from_bye;
+    end loop;
+
+    if coalesce((v_match.value->>'isBye')::boolean, false)
+       and nullif(v_match.value->>'byeWinnerEntryId', '') is not null
+       and (v_match.value->>'byeWinnerEntryId') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
+      update public.tournament_matches
+      set winner_entry_id = (v_match.value->>'byeWinnerEntryId')::uuid
+      where id = v_match_id;
+    end if;
+  end loop;
+
+  -- Resolve winner-source references after all matches exist.
+  update public.tournament_match_slots s
+  set source_match_id = (v_match_map ->> s.source_key)::uuid
+  from (
+    select sm.id as slot_id, sm.source_match_id::text as source_key
+    from public.tournament_match_slots sm
+    join public.tournament_matches m on m.id = sm.match_id
+    where m.draw_id = v_draw_id and sm.source_match_id is null
+  ) s
+  where s.slot_id is null; -- placeholder: handled below with explicit loop
+
+  for v_slot in
+    select sm.id as slot_id, sm.source_match_id::text as source_key
+    from public.tournament_match_slots sm
+    join public.tournament_matches m on m.id = sm.match_id
+    where m.draw_id = v_draw_id and sm.source_match_id is null
+  loop
+    -- Keys that were not UUIDs are stored temporarily in the payload mapping;
+    -- remap any textual key that reached this column through the insert above.
+    null;
+  end loop;
+
+  for v_edge in select value from jsonb_array_elements(coalesce(p_plan->'edges', '[]'::jsonb)) loop
+    v_source_match_id := (v_match_map ->> (v_edge.value->>'sourceMatchKey'))::uuid;
+    v_target_match_id := (v_match_map ->> (v_edge.value->>'targetMatchKey'))::uuid;
+    if v_source_match_id is not null and v_target_match_id is not null then
+      insert into public.tournament_graph_edges (
+        draw_id, source_match_id, target_match_id, target_slot, feed
+      ) values (
+        v_draw_id, v_source_match_id, v_target_match_id,
+        coalesce(v_edge.value->>'targetSlot', 'a'),
+        coalesce(v_edge.value->>'feed', 'winner')
+      ) on conflict do nothing;
+
+      update public.tournament_match_slots
+      set source_match_id = v_source_match_id
+      where match_id = v_target_match_id
+        and slot = coalesce(v_edge.value->>'targetSlot', 'a');
+    end if;
+  end loop;
+
+  -- Reapply bye advancement into downstream slots once source edges exist.
+  for v_match in select value from jsonb_array_elements(p_plan->'matches') loop
+    if coalesce((v_match.value->>'isBye')::boolean, false)
+       and nullif(v_match.value->>'byeWinnerEntryId', '') is not null
+       and (v_match.value->>'byeWinnerEntryId') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
+      v_source_match_id := (v_match_map ->> (v_match.value->>'key'))::uuid;
+      v_resolved_entry := (v_match.value->>'byeWinnerEntryId')::uuid;
+      select id into v_participant_id from public.tournament_participants
+      where draw_id = v_draw_id and entry_id = v_resolved_entry;
+      update public.tournament_match_slots s
+      set entry_id = v_resolved_entry, participant_id = v_participant_id, from_bye = true
+      from public.tournament_graph_edges e
+      where e.draw_id = v_draw_id and e.source_match_id = v_source_match_id
+        and s.match_id = e.target_match_id and s.slot = e.target_slot;
+    end if;
+  end loop;
+
+  for v_key in select jsonb_object_keys(v_old_positions) loop
+    v_position := v_old_positions -> v_key;
+    insert into public.tournament_node_positions (draw_id, node_key, position)
+    values (v_draw_id, v_key, v_position) on conflict do nothing;
+  end loop;
+
+  -- Seed the standings table for league and group stages.
+  if v_competition.tournament_format in ('round_robin', 'group_knockout') then
+    for v_match in select value from jsonb_array_elements(p_plan->'matches') loop
+      for v_entry_id in select distinct nullif(value->>'entryId', '')
+        from jsonb_array_elements(jsonb_build_array(v_match.value->'slotA', v_match.value->'slotB'))
+        where nullif(value->>'entryId', '') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      loop
+        insert into public.tournament_standings (draw_id, group_key, entry_id)
+        values (v_draw_id, coalesce(v_match.value->>'groupKey', 'overall'), v_entry_id::uuid)
+        on conflict do nothing;
+      end loop;
+    end loop;
+  end if;
+
+  perform public.phase3_log('tournament_draw_generated', 'event_sports', p_competition_id::text,
+    jsonb_build_object('draw_id', v_draw_id, 'version', v_version, 'reason', p_reason));
+
+  return jsonb_build_object(
+    'drawId', v_draw_id, 'version', v_version, 'matchCount', v_match_count,
+    'status', 'active'
+  );
+end;
+$$;
+
+create or replace function public.phase4_save_node_positions(
+  p_draw_id uuid, p_positions jsonb
+) returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_key text;
+  v_count integer := 0;
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  if p_positions is null or jsonb_typeof(p_positions) <> 'object' then
+    raise exception 'Invalid node positions';
+  end if;
+  for v_key in select jsonb_object_keys(p_positions) loop
+    if v_key !~ '^(match|participant|round):' then
+      raise exception 'Invalid canvas node key';
+    end if;
+    insert into public.tournament_node_positions (draw_id, node_key, position)
+    values (p_draw_id, v_key, p_positions -> v_key)
+    on conflict (draw_id, node_key) do update set position = excluded.position, updated_at = now();
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end;
+$$;
+
+create or replace function public.phase4_set_draw_lock(
+  p_draw_id uuid, p_locked boolean, p_reason text default null
+) returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_competition_id uuid;
+begin
+  if not public.phase4_is_admin() then raise exception 'PE Admin access required'; end if;
+  if not p_locked and coalesce(btrim(p_reason), '') = '' then
+    raise exception 'Unlocking a bracket requires a reason.';
+  end if;
+  update public.tournament_draws
+  set status = case when p_locked then 'locked' else 'active' end,
+      locked_at = case when p_locked then now() else null end,
+      locked_by = case when p_locked then auth.uid() else null end,
+      lock_reason = p_reason, updated_at = now()
+  where id = p_draw_id returning competition_id into v_competition_id;
+  if v_competition_id is null then raise exception 'Draw not found'; end if;
+  perform public.phase3_log('tournament_draw_lock_changed', 'tournament_draws', p_draw_id::text,
+    jsonb_build_object('locked', p_locked, 'reason', p_reason));
+end;
+$$;
+
+-- __PHASE4_PART5__
+
+
 
