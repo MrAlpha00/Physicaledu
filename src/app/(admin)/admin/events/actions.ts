@@ -178,7 +178,7 @@ export async function saveEligibilityRule(input: z.input<typeof eligibilityRuleS
   const { error } = await supabase.from("competition_eligibility_rules").insert({
     competition_id: data.competitionId,
     rule_type: data.ruleType,
-    rule_value: data.ruleValue,
+    rule_value: data.ruleValue as unknown as Json,
     description: data.description || null,
   });
   if (error) return { status: "error", message: error.message };

@@ -91,7 +91,7 @@ export async function generateTournamentAction(input: z.input<typeof drawSchema>
       groupCount: context.sport.group_count ?? undefined,
       qualifiersPerGroup: context.sport.qualifiers_per_group ?? undefined,
       legs: context.sport.legs,
-      points: context.sport.points as PointsConfig,
+      points: context.sport.points as unknown as PointsConfig,
       version: 1,
     });
     return await persistPlan(parsed.data.competitionId, context.sport.event_id, plan, parsed.data.reason ?? null);
@@ -120,7 +120,7 @@ export async function saveManualPairings(input: z.input<typeof manualDrawSchema>
       format: "knockout",
       entries: context.entries,
       drawSeed: 0,
-      points: context.sport.points as PointsConfig,
+      points: context.sport.points as unknown as PointsConfig,
       thirdPlace: context.sport.third_place,
     });
     return await persistPlan(parsed.data.sportId, parsed.data.eventId, plan, parsed.data.reason || null);
@@ -241,8 +241,11 @@ async function maybeRecordFinalAchievement(matchId: string): Promise<void> {
   const supabase = await createClient();
   const { data: match } = await supabase.from("tournament_matches").select("*").eq("id", matchId).maybeSingle();
   if (!match?.winner_entry_id || match.round_name !== "Final") return;
+  const { data: draw } = await supabase
+    .from("tournament_draws").select("competition_id").eq("id", match.draw_id).maybeSingle();
+  if (!draw) return;
   const { data: sport } = await supabase
-    .from("event_sports").select("*").eq("id", match.competition_id).maybeSingle();
+    .from("event_sports").select("*").eq("id", draw.competition_id).maybeSingle();
   if (!sport) return;
   const [{ data: entry }, { data: event }] = await Promise.all([
     supabase.from("competition_entries").select("*").eq("id", match.winner_entry_id).maybeSingle(),
