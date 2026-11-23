@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { competitionRulesSchema, type CompetitionRulesInput } from "@/lib/validations/phase4";
 import type { ActionState } from "@/types/domain";
 import type { Json, Phase4EligibilityRow, Phase4PaymentSettingsRow, Phase4RulesRow } from "@/types/database";
 
@@ -154,7 +155,7 @@ export function CompetitionRulesForm({
             defaultValue={JSON.stringify(rules?.custom_questions ?? [], null, 2)}
             className={fieldClass}
           />
-          <p className="text-xs text-ink-muted">Example: [{"key":"jersey","label":"Jersey size","type":"select","options":["M","L"],"required":true}]</p>
+          <p className="text-xs text-ink-muted">{`Example: [{"key":"jersey","label":"Jersey size","type":"select","options":["M","L"],"required":true}]`}</p>
         </div>
         <div className="flex flex-wrap gap-5 border-t border-navy/10 pt-5">
           {[

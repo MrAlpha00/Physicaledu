@@ -88,7 +88,7 @@ export function EventForm({ event }: { event: Phase4EventRow | null }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="academicYear">Academic year</Label>
-          <Input id="academicYear" name="academicYear" required defaultValue={event?.academicYear ?? "2026-27"} className={fieldClass} />
+          <Input id="academicYear" name="academicYear" required defaultValue={event?.academic_year ?? "2026-27"} className={fieldClass} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="venue">Venue</Label>
@@ -135,7 +135,7 @@ export function EventForm({ event }: { event: Phase4EventRow | null }) {
           </select>
         </div>
         <label className="flex items-center gap-3 self-end border border-navy/15 px-4 py-3 text-sm font-semibold">
-          <input type="checkbox" name="isPublic" defaultChecked={event?.isPublic ?? false} className="size-4 accent-[#3564E9]" />
+          <input type="checkbox" name="isPublic" defaultChecked={event?.is_public ?? false} className="size-4 accent-[#3564E9]" />
           Visible on the public events site
         </label>
       </div>

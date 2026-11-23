@@ -221,13 +221,13 @@ export function SportForm({
       </div>
       <div className="flex flex-wrap gap-6 border-t border-navy/10 pt-6">
         <label className="flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" name="isPublic" defaultChecked={sport?.isPublic ?? true} className="size-4 accent-[#3564E9]" /> Public competition
+          <input type="checkbox" name="isPublic" defaultChecked={sport?.is_public ?? true} className="size-4 accent-[#3564E9]" /> Public competition
         </label>
         <label className="flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" name="thirdPlace" defaultChecked={sport?.thirdPlace ?? false} className="size-4 accent-[#3564E9]" /> Third-place match
+          <input type="checkbox" name="thirdPlace" defaultChecked={sport?.third_place ?? false} className="size-4 accent-[#3564E9]" /> Third-place match
         </label>
         <label className="flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" name="autoAdvance" defaultChecked={sport?.autoAdvance ?? true} className="size-4 accent-[#3564E9]" /> Auto-advance winners
+          <input type="checkbox" name="autoAdvance" defaultChecked={sport?.auto_advance ?? true} className="size-4 accent-[#3564E9]" /> Auto-advance winners
         </label>
         <label className="flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" name="organizerResultsRequireApproval" defaultChecked={sport?.organizer_results_require_approval ?? false} className="size-4 accent-[#3564E9]" /> Organiser results need approval
