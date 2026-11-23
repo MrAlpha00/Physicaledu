@@ -216,9 +216,10 @@ function buildBracket(
     });
     matchKeysByRound.push(roundMatchKeys);
 
+    // Each match produces one next-round slot. Byes are already decided, so
+    // their winner occupies that slot before any result is submitted.
     const nextSlots: Array<TournamentEntry | null> = [];
-    for (let index = 0; index < roundMatchKeys.length; index += 2) {
-      const sourceKey = roundMatchKeys[index];
+    for (const sourceKey of roundMatchKeys) {
       const sourceMatch = matches.find((match) => match.key === sourceKey);
       if (sourceMatch?.isBye && sourceMatch.byeWinnerEntryId) {
         nextSlots.push({ entryId: sourceMatch.byeWinnerEntryId, seed: null, label: "" });

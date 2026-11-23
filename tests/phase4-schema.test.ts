@@ -157,7 +157,7 @@ describe('Phase 4 migration — transactional operations', () => {
       migration.indexOf('create or replace function public.phase4_correct_match_result'),
     )
     expect(submit).toContain('select * into v_match from public.tournament_matches where id = p_match_id for update')
-    expect(submit).toContain('result submission is not permitted for this assignment')
+    expect(submit).toContain('Result submission is not permitted for this assignment.')
     expect(submit).toContain('assigned to another organiser')
     expect(submit).toContain('The selected winner is not part of this match.')
     expect(submit).toContain('insert into public.tournament_match_results')

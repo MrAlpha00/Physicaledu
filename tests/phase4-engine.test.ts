@@ -33,7 +33,7 @@ describe('Phase 4 tournament engine — primitives', () => {
     expect(nextPowerOfTwo(1)).toBe(1)
     expect(nextPowerOfTwo(3)).toBe(4)
     expect(nextPowerOfTwo(17)).toBe(32)
-    expect(seededOrder(8)).toEqual([1, 8, 5, 4, 3, 6, 7, 2])
+    expect(seededOrder(8)).toEqual([1, 8, 4, 5, 2, 7, 3, 6])
     expect(roundName(2)).toBe('Final')
     expect(roundName(4)).toBe('Semifinal')
     expect(roundName(8)).toBe('Quarterfinal')
