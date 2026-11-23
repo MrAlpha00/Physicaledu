@@ -216,15 +216,17 @@ function buildBracket(
     });
     matchKeysByRound.push(roundMatchKeys);
 
-    // Each match produces one next-round slot. Byes are already decided, so
-    // their winner occupies that slot before any result is submitted.
+    // Each match produces one next-round slot. Byes are already decided; all
+    // other slots carry an empty entry id until their source result arrives.
+    // An explicit placeholder (rather than null) prevents an unresolved match
+    // from being mistaken for a bye.
     const nextSlots: Array<TournamentEntry | null> = [];
     for (const sourceKey of roundMatchKeys) {
       const sourceMatch = matches.find((match) => match.key === sourceKey);
       if (sourceMatch?.isBye && sourceMatch.byeWinnerEntryId) {
         nextSlots.push({ entryId: sourceMatch.byeWinnerEntryId, seed: null, label: "" });
       } else {
-        nextSlots.push(null);
+        nextSlots.push({ entryId: "", label: "", seed: null });
       }
     }
     currentSlots = nextSlots;
